@@ -1,4 +1,4 @@
-# Budget
+# laurent-budget
 
 Android app that scans a card payment receipt with the camera, finds the **amount**, the **shop** and the **date**,
 stores the ticket locally, and can upload the photo and the data to an S3 bucket.
