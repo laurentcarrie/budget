@@ -1,26 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical">
-    <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="3">
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+        android:orientation="vertical">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center" android:paddingTop="12dp" android:paddingBottom="12dp">
+            <ImageButton android:id="@+id/speak" android:contentDescription="Parler"
+                android:layout_width="96dp" android:layout_height="96dp" android:layout_margin="12dp"
+                android:src="@drawable/ic_mic" android:tint="#37474F" android:background="@drawable/btn_round"
+                android:scaleType="fitCenter" android:padding="24dp" />
+            <ImageButton android:id="@+id/scan" android:contentDescription="Scanner un ticket"
+                android:layout_width="96dp" android:layout_height="96dp" android:layout_margin="12dp"
+                android:src="@drawable/ic_camera" android:tint="#37474F" android:background="@drawable/btn_round"
+                android:scaleType="fitCenter" android:padding="24dp" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:id="@+id/total" android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:padding="8dp" android:textStyle="bold" android:textSize="16sp" />
+            <Button android:id="@+id/settings" android:text="Réglages" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:layout_marginEnd="8dp" />
+            <Button android:id="@+id/upload" android:text="Synchro" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:layout_marginEnd="8dp" />
+        </LinearLayout>
+        <ListView android:id="@+id/list" android:layout_width="match_parent"
+            android:layout_height="0dp" android:layout_weight="1" />
+    </LinearLayout>
+
+    <!-- The camera is only opened (and the preview only shown) after the camera icon is pressed. -->
+    <FrameLayout android:id="@+id/camera_overlay" android:visibility="gone"
+        android:layout_width="match_parent" android:layout_height="match_parent" android:background="#FF000000">
         <androidx.camera.view.PreviewView android:id="@+id/preview"
             android:layout_width="match_parent" android:layout_height="match_parent" />
-        <Button android:id="@+id/capture" android:text="Scanner un ticket"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_gravity="bottom|center_horizontal" android:layout_margin="16dp" />
-        <Button android:id="@+id/speak" android:text="Parler"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_gravity="bottom|start" android:layout_margin="16dp" />
+        <ImageButton android:id="@+id/capture" android:contentDescription="Prendre la photo"
+            android:layout_width="96dp" android:layout_height="96dp" android:layout_margin="28dp"
+            android:layout_gravity="bottom|center_horizontal" android:src="@drawable/ic_shutter"
+            android:background="@null" android:scaleType="fitCenter" />
+        <ImageButton android:id="@+id/close_camera" android:contentDescription="Fermer la caméra"
+            android:layout_width="64dp" android:layout_height="64dp" android:layout_margin="16dp"
+            android:layout_gravity="top|end" android:src="@drawable/ic_close" android:tint="#FFFFFF"
+            android:background="@null" android:scaleType="fitCenter" android:padding="16dp" />
     </FrameLayout>
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="horizontal" android:gravity="center_vertical">
-        <TextView android:id="@+id/total" android:layout_width="0dp" android:layout_height="wrap_content"
-            android:layout_weight="1" android:padding="8dp" android:textStyle="bold" android:textSize="16sp" />
-        <Button android:id="@+id/settings" android:text="Réglages" android:layout_width="wrap_content"
-            android:layout_height="wrap_content" android:layout_marginEnd="8dp" />
-        <Button android:id="@+id/upload" android:text="Synchro" android:layout_width="wrap_content"
-            android:layout_height="wrap_content" android:layout_marginEnd="8dp" />
-    </LinearLayout>
-    <ListView android:id="@+id/list" android:layout_width="match_parent"
-        android:layout_height="0dp" android:layout_weight="2" />
-</LinearLayout>
+</FrameLayout>

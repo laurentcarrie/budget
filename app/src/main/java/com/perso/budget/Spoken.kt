@@ -142,4 +142,54 @@ object Spoken {
         Parser.knownShop(cleaned.joinToString("\n"), shops)?.let { return it }
         return cleaned.first().replaceFirstChar { it.uppercase() }
     }
+
+    // ---- Dates said aloud: "hier", "le 7 novembre", "samedi dernier", "il y a deux jours" ----
+
+    /** What is left of [text] once the date words are removed, and the date they meant (null when there was none). */
+    data class Dated(val text: String, val date: java.time.LocalDate?)
+
+    private val weekdays = mapOf(
+        "lundi" to java.time.DayOfWeek.MONDAY, "mardi" to java.time.DayOfWeek.TUESDAY, "mercredi" to java.time.DayOfWeek.WEDNESDAY,
+        "jeudi" to java.time.DayOfWeek.THURSDAY, "vendredi" to java.time.DayOfWeek.FRIDAY, "samedi" to java.time.DayOfWeek.SATURDAY,
+        "dimanche" to java.time.DayOfWeek.SUNDAY)
+
+    private val monthNames = mapOf(
+        "janvier" to 1, "janv" to 1, "fevrier" to 2, "fevr" to 2, "mars" to 3, "avril" to 4, "avr" to 4, "mai" to 5,
+        "juin" to 6, "juillet" to 7, "juil" to 7, "aout" to 8, "septembre" to 9, "sept" to 9, "octobre" to 10, "oct" to 10,
+        "novembre" to 11, "nov" to 11, "decembre" to 12, "dec" to 12)
+
+    fun withoutDate(text: String, today: java.time.LocalDate = java.time.LocalDate.now()): Dated {
+        val words = text.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val n = words.map { unaccent(it.lowercase()).replace('\u2019', '\'').trim(',', '.', ';', '!', '?') }
+        fun num(i: Int): Int? = n.getOrNull(i)?.let { it.toIntOrNull() ?: units[it] }
+        fun hit(from: Int, to: Int, date: java.time.LocalDate): Dated {
+            val start = if (from > 0 && n[from - 1] == "le") from - 1 else from // "le 7 novembre", "le samedi"
+            return Dated(words.filterIndexed { i, _ -> i < start || i > to }.joinToString(" "), date)
+        }
+        for (i in words.indices) {
+            val w = n[i]
+            when {
+                w == "avant" && n.getOrNull(i + 1) == "hier" -> return hit(i, i + 1, today.minusDays(2))
+                w == "avant-hier" -> return hit(i, i, today.minusDays(2))
+                w == "hier" -> return hit(i, i, today.minusDays(1))
+                w == "aujourd'hui" || w == "aujourdhui" -> return hit(i, i, today)
+                w == "il" && n.getOrNull(i + 1) == "y" && n.getOrNull(i + 2) == "a" && num(i + 3) != null &&
+                    n.getOrNull(i + 4)?.startsWith("jour") == true -> return hit(i, i + 4, today.minusDays(num(i + 3)!!.toLong()))
+                w in weekdays -> {
+                    val last = n.getOrNull(i + 1).let { it == "dernier" || it == "derniere" }
+                    var d = today.minusDays(((today.dayOfWeek.value - weekdays.getValue(w).value + 7) % 7).toLong())
+                    if (last && d == today) d = today.minusDays(7)
+                    return hit(i, if (last) i + 1 else i, d)
+                }
+                w.toIntOrNull() in 1..31 && n.getOrNull(i + 1) in monthNames -> {
+                    val month = monthNames.getValue(n[i + 1])
+                    val year = n.getOrNull(i + 2)?.takeIf { it.length == 4 }?.toIntOrNull()?.takeIf { it in 2000..2100 }
+                    var d = try { java.time.LocalDate.of(year ?: today.year, month, w.toInt()) } catch (e: Exception) { null } ?: continue
+                    if (year == null && d.isAfter(today)) d = d.minusYears(1) // "le 25 decembre" said in november is last year's
+                    return hit(i, if (year != null) i + 2 else i + 1, d)
+                }
+            }
+        }
+        return Dated(text, null)
+    }
 }

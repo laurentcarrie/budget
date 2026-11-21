@@ -82,4 +82,54 @@ class SpokenTest {
         assertNull(Spoken.shop(emptyList(), known))
         assertNull(Spoken.shop(listOf("  "), known))
     }
+
+    // ---- dates said aloud (today is Saturday 21 November 2026) ----
+    private val today = java.time.LocalDate.of(2026, 11, 21)
+    private fun d(s: String) = Spoken.withoutDate(s, today)
+    private fun date(y: Int, m: Int, day: Int) = java.time.LocalDate.of(y, m, day)
+
+    @Test fun yesterdayAndTheDayBefore() {
+        assertEquals(Spoken.Dated("quatorze euros", date(2026, 11, 20)), d("quatorze euros hier"))
+        assertEquals(date(2026, 11, 19), d("avant-hier").date)
+        assertEquals(date(2026, 11, 19), d("avant hier").date)
+        assertEquals(today, d("aujourd'hui").date)
+    }
+
+    @Test fun aDayAndAMonth() {
+        assertEquals(Spoken.Dated("", date(2026, 11, 7)), d("le 7 novembre"))
+        assertEquals(date(2026, 11, 7), d("7 novembre").date)
+        assertEquals(date(2025, 11, 7), d("le 7 novembre 2025").date)
+        assertEquals(date(2026, 1, 3), d("le 3 janv.").date)
+        assertEquals(date(2026, 2, 28), d("28 f\u00e9vrier").date)
+        assertEquals(date(2025, 12, 25), d("le 25 d\u00e9cembre").date) // not yet this year
+    }
+
+    @Test fun theDateWordsDoNotDisturbTheAmountOrTheShop() {
+        assertEquals(13.0, Spoken.amount(d("treize euros le 7 novembre").text)!!, 0.001)
+        assertEquals("chez Carbone", d("chez Carbone hier").text)
+        assertEquals("pub", d("pub le 7 novembre").text)
+        assertEquals(14.8, Spoken.amount(d("quatorze euros quatre-vingts hier").text)!!, 0.001)
+    }
+
+    @Test fun weekdays() {
+        assertEquals(date(2026, 11, 14), d("samedi dernier").date) // today is a Saturday
+        assertEquals(today, d("samedi").date)
+        assertEquals(date(2026, 11, 20), d("vendredi dernier").date)
+        assertEquals(date(2026, 11, 16), d("lundi").date)
+        assertEquals(date(2026, 11, 15), d("dimanche dernier").date)
+        assertEquals(Spoken.Dated("caf\u00e9", date(2026, 11, 18)), d("caf\u00e9 le mercredi"))
+    }
+
+    @Test fun someDaysAgo() {
+        assertEquals(date(2026, 11, 19), d("il y a deux jours").date)
+        assertEquals(date(2026, 11, 18), d("il y a 3 jours").date)
+        assertEquals(date(2026, 11, 20), d("il y a un jour").date)
+    }
+
+    @Test fun noDateKeepsTheText() {
+        assertEquals(Spoken.Dated("quatorze euros quatre-vingts", null), d("quatorze euros quatre-vingts"))
+        assertEquals(Spoken.Dated("chez Carbone", null), d("chez Carbone"))
+        assertNull(d("12 euros").date)
+        assertNull(d("31 f\u00e9vrier").date)
+    }
 }

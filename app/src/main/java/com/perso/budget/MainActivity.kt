@@ -13,6 +13,7 @@ import android.speech.SpeechRecognizer
 import android.util.Log
 import android.view.LayoutInflater
 import android.widget.*
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
@@ -46,14 +47,17 @@ class MainActivity : AppCompatActivity() {
         total = findViewById(R.id.total)
         list.setOnItemClickListener { _, _, pos, _ -> edit(items[pos]) }
         list.setOnItemLongClickListener { _, _, pos, _ -> confirmDelete(items[pos]); true }
-        findViewById<Button>(R.id.capture).setOnClickListener { capture() }
-        findViewById<Button>(R.id.speak).setOnClickListener { speak() }
+        findViewById<android.view.View>(R.id.scan).setOnClickListener { openCamera() }
+        findViewById<android.view.View>(R.id.capture).setOnClickListener { capture() }
+        findViewById<android.view.View>(R.id.close_camera).setOnClickListener { closeCamera() }
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() { if (cameraOpen()) closeCamera() else { isEnabled = false; onBackPressedDispatcher.onBackPressed() } }
+        })
+        findViewById<android.view.View>(R.id.speak).setOnClickListener { speak() }
         findViewById<Button>(R.id.upload).setOnClickListener { sync(false) }
         findViewById<Button>(R.id.settings).setOnClickListener { settings() }
         refresh()
         intent.getStringExtra("rescan")?.let { recognize(File(filesDir, File(it).name)) }
-        if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) startCamera()
-        else requestPermissions(arrayOf(Manifest.permission.CAMERA), 1)
     }
 
     override fun onRequestPermissionsResult(code: Int, p: Array<out String>, r: IntArray) {
@@ -61,15 +65,34 @@ class MainActivity : AppCompatActivity() {
         val granted = r.firstOrNull() == PackageManager.PERMISSION_GRANTED
         when {
             code == 2 -> if (granted) speak() else toast("L'autorisation du micro est n\u00e9cessaire pour la saisie vocale")
-            granted -> startCamera()
+            granted -> openCamera()
             else -> toast("L'autorisation de la cam\u00e9ra est n\u00e9cessaire")
         }
     }
+
+    private var cameraProvider: ProcessCameraProvider? = null
+
+    /** The camera is opened only when the camera icon is pressed, and closed after the photo (or with the cross / back). */
+    private fun openCamera() {
+        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.CAMERA), 1); return
+        }
+        findViewById<android.view.View>(R.id.camera_overlay).visibility = android.view.View.VISIBLE
+        startCamera()
+    }
+
+    private fun closeCamera() {
+        cameraProvider?.unbindAll(); imageCapture = null
+        findViewById<android.view.View>(R.id.camera_overlay).visibility = android.view.View.GONE
+    }
+
+    private fun cameraOpen() = findViewById<android.view.View>(R.id.camera_overlay).visibility == android.view.View.VISIBLE
 
     private fun startCamera() {
         val f = ProcessCameraProvider.getInstance(this)
         f.addListener({
             val provider = f.get()
+            cameraProvider = provider
             val preview = Preview.Builder().build().also {
                 it.setSurfaceProvider(findViewById<PreviewView>(R.id.preview).surfaceProvider)
             }
@@ -84,7 +107,7 @@ class MainActivity : AppCompatActivity() {
         val file = File(filesDir, "ticket_${System.currentTimeMillis()}_${deviceSuffix()}.jpg")
         ic.takePicture(ImageCapture.OutputFileOptions.Builder(file).build(),
             ContextCompat.getMainExecutor(this), object : ImageCapture.OnImageSavedCallback {
-                override fun onImageSaved(o: ImageCapture.OutputFileResults) { recognize(file) }
+                override fun onImageSaved(o: ImageCapture.OutputFileResults) { closeCamera(); recognize(file) }
                 override fun onError(e: ImageCaptureException) { toast("\u00c9chec de la capture : ${e.message}") }
             })
     }
@@ -277,6 +300,7 @@ class MainActivity : AppCompatActivity() {
     private var spokenAmount: Double? = null
     private var heard = ""
     private var useOffline = true
+    private var spokenDate: java.time.LocalDate? = null
 
     private fun speak() {
         if (!SpeechRecognizer.isRecognitionAvailable(this)) { toast("Pas de reconnaissance vocale sur cet appareil"); return }
@@ -284,7 +308,7 @@ class MainActivity : AppCompatActivity() {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 2); return
         }
         endSession()
-        spokenAmount = null; heard = ""
+        spokenAmount = null; spokenDate = null; heard = ""
         speech = SpeechRecognizer.createSpeechRecognizer(this)
         chooseEngine { offline -> useOffline = offline; listen(true, offline) }
     }
@@ -319,8 +343,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun listen(amountStep: Boolean, offline: Boolean) {
         val r = speech ?: return
-        val example = if (amountStep) "Dites le montant, par exemple : \u00ab quatorze euros quatre-vingts \u00bb"
-                      else "Dites le magasin, par exemple : \u00ab chez Carbone \u00bb"
+        val example = if (amountStep) "Dites le montant, par exemple : \u00ab quatorze euros quatre-vingts \u00bb\n\nSi ce n'est pas aujourd'hui, ajoutez la date : \u00ab hier \u00bb, \u00ab le 7 novembre \u00bb, \u00ab samedi dernier \u00bb"
+                      else "Dites le magasin, par exemple : \u00ab chez Carbone \u00bb\n\n(Vous pouvez aussi dire la date ici.)"
         listening?.dismiss()
         listening = AlertDialog.Builder(this).setTitle(if (amountStep) "Montant" else "Magasin").setMessage("D\u00e9marrage...\n\n$example")
             .setNegativeButton("Annuler") { _, _ -> endSession() }.setCancelable(false).show()
@@ -371,21 +395,25 @@ class MainActivity : AppCompatActivity() {
 
     private fun heard(amountStep: Boolean, words: List<String>) {
         if (words.isEmpty()) { endSession(); toast("Rien compris, r\u00e9essayez"); return }
+        val parsed = words.map { Spoken.withoutDate(it) } // the date words are taken out before the amount and the shop are read
         if (amountStep) {
-            spokenAmount = words.firstNotNullOfOrNull { Spoken.amount(it) }
+            val i = parsed.indexOfFirst { Spoken.amount(it.text) != null }
+            spokenAmount = if (i >= 0) Spoken.amount(parsed[i].text) else null
+            spokenDate = (if (i >= 0) parsed[i].date else null) ?: parsed.firstNotNullOfOrNull { it.date }
             heard = "\u00ab ${words.first()} \u00bb"
             if (spokenAmount == null) toast("Montant non compris, vous pouvez le saisir")
             speech?.cancel(); listen(false, useOffline)
         } else {
             heard += "  \u00ab ${words.first()} \u00bb"
+            if (spokenDate == null) spokenDate = parsed.firstNotNullOfOrNull { it.date }
             endSession()
-            confirmSpoken(Spoken.shop(words, db.shops()) ?: "", spokenAmount)
+            confirmSpoken(Spoken.shop(parsed.map { it.text }.filter { it.isNotBlank() }, db.shops()) ?: "", spokenAmount, spokenDate)
         }
     }
 
     /** The ticket said aloud has no photo: it is saved like the others, and synced. */
-    private fun confirmSpoken(shop: String, amount: Double?) {
-        val v = ticketView(File(""), now(), shop, amount)
+    private fun confirmSpoken(shop: String, amount: Double?, date: java.time.LocalDate?) {
+        val v = ticketView(File(""), date?.toString() ?: now(), shop, amount)
         AlertDialog.Builder(this).setTitle("V\u00e9rifier et enregistrer").setMessage("J'ai entendu : $heard").setView(v)
             .setPositiveButton("Enregistrer") { _, _ ->
                 val f = fields(v, now())
@@ -395,7 +423,7 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Annuler", null).setCancelable(false).show()
     }
 
-    override fun onDestroy() { endSession(); super.onDestroy() }
+    override fun onDestroy() { endSession(); cameraProvider?.unbindAll(); super.onDestroy() }
 
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_SHORT).show()
 }

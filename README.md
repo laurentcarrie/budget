@@ -17,13 +17,17 @@ service). The only network calls are the sync, when you press **Synchro** and on
 4. Tap a ticket to correct its date, shop or amount (the shop field proposes the known shops), to add a free
    description, or to delete it; a long press deletes it directly. The description is shown after the amount in the
    list and travels with the ticket when syncing.
-5. No ticket to scan? **Parler** asks for the amount, then for the shop, in French (for example "quatorze euros
+5. The main screen has two icons: the microphone (voice entry) and the camera (scan). The camera is off until the
+   camera icon is pressed; the round button takes the photo, the cross or Back closes it.
+6. No ticket to scan? **Parler** asks for the amount, then for the shop, in French (for example "quatorze euros
    quatre-vingts", then "chez Carbone"). The same dialog opens prefilled, with what was heard; the ticket has no photo.
    The recognition is Android's speech service: it uses the offline French pack when it is installed (Google speech
    settings), otherwise it sends the audio to Google. `Spoken.kt` turns the French words or digits into an amount
    (`14 euros 80`, `14,80`, `douze cinquante`, `quatre-vingt-dix-neuf euros`) and the shop into a known shop when it
    matches.
-6. **Synchro** pushes what changed on this device and pulls what the other devices pushed (see below). A ✓ means the
+   A date can be said with the amount or the shop and is taken out of the words before they are read: "hier",
+   "avant-hier", "le 7 novembre", "samedi dernier", "il y a deux jours" (the ticket then has that day, without a time).
+7. **Synchro** pushes what changed on this device and pulls what the other devices pushed (see below). A ✓ means the
    ticket is in sync. Edits and deletes reach the other devices at their next sync; saving an edit also starts a sync.
 
 The parser (`Parser.kt`) is plain Kotlin:
