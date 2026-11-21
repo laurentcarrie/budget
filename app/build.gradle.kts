@@ -4,6 +4,8 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+base { archivesName.set("laurent-budget") }
+
 val aws = Properties().apply {
     rootProject.file("aws.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
 }

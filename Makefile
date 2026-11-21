@@ -1,10 +1,10 @@
 # The device keeps the app signed with one key: deploy the release apk when there is a signing key, the debug one otherwise.
 HAS_KEY := $(wildcard keystore.properties)
 ifdef HAS_KEY
-APK := app/build/outputs/apk/release/app-release.apk
+APK := app/build/outputs/apk/release/laurent-budget-release.apk
 BUILD := release
 else
-APK := app/build/outputs/apk/debug/app-debug.apk
+APK := app/build/outputs/apk/debug/laurent-budget-debug.apk
 BUILD := build
 endif
 PKG := com.perso.budget
@@ -23,7 +23,7 @@ build: ## build the debug apk
 release: ## build the signed release apk (needs keystore.properties)
 	@test -f keystore.properties || { echo "keystore.properties is missing: no signing key"; exit 1; }
 	./gradlew assembleRelease -q
-	@ls -l app/build/outputs/apk/release/app-release.apk
+	@ls -l app/build/outputs/apk/release/laurent-budget-release.apk
 
 deploy: $(BUILD) ## build and install the apk (release if keystore.properties exists) on the connected device (adb), grant camera
 	$(ADB) wait-for-device
@@ -33,9 +33,9 @@ deploy: $(BUILD) ## build and install the apk (release if keystore.properties ex
 run: deploy ## deploy and launch the app
 	$(ADB) shell monkey -p $(PKG) -c android.intent.category.LAUNCHER 1
 
-GDRIVE_FILE := gdrive:apk/budget/budget.apk
+GDRIVE_FILE := gdrive:apk/budget/laurent-budget.apk
 
-gdrive: $(BUILD) ## build the apk (release if keystore.properties exists) and upload it as budget.apk to gdrive:apk/budget with rclone
+gdrive: $(BUILD) ## build the apk (release if keystore.properties exists) and upload it as laurent-budget.apk to gdrive:apk/budget with rclone
 	rclone copyto -v $(APK) $(GDRIVE_FILE)
 	@rclone lsl $(GDRIVE_FILE)
 
