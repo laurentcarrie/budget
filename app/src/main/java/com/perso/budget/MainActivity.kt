@@ -38,6 +38,7 @@ class MainActivity : AppCompatActivity() {
     private var imageCapture: ImageCapture? = null
     private val recognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
     private var items: List<Receipt> = emptyList()
+    private var query = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,6 +48,11 @@ class MainActivity : AppCompatActivity() {
         total = findViewById(R.id.total)
         list.setOnItemClickListener { _, _, pos, _ -> edit(items[pos]) }
         list.setOnItemLongClickListener { _, _, pos, _ -> confirmDelete(items[pos]); true }
+        findViewById<EditText>(R.id.search).addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) { query = s?.toString().orEmpty(); refresh() }
+            override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
+            override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
+        })
         findViewById<android.view.View>(R.id.scan).setOnClickListener { openCamera() }
         findViewById<android.view.View>(R.id.capture).setOnClickListener { capture() }
         findViewById<android.view.View>(R.id.close_camera).setOnClickListener { closeCamera() }
@@ -172,6 +178,9 @@ class MainActivity : AppCompatActivity() {
         val shopField = v.findViewById<AutoCompleteTextView>(R.id.shop)
         shopField.setAdapter(ShopAdapter(this, db.shops().filter { it.isNotBlank() && it != "Unknown" }, shop))
         shopField.setText(shop)
+        // The list opens upward over the keyboard: keep it short enough to stay on screen (it scrolls), or its first
+        // rows (the most used shops) end up above the top edge.
+        shopField.dropDownHeight = (resources.displayMetrics.heightPixels * 0.30f).toInt()
         // Show every known shop as soon as the field is tapped, not only after typing.
         shopField.setOnClickListener { shopField.showDropDown() }
         shopField.setOnFocusChangeListener { _, focused -> if (focused) shopField.showDropDown() }
@@ -223,11 +232,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refresh() {
-        items = db.all()
+        val all = db.all()
+        items = all.filter { Search.matches(query, it) }
         list.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1,
             items.map { "${if (it.uploaded) "\u2713 " else ""}${it.date}  ${it.shop}  %.2f EUR".format(Locale.US, it.amount) +
                 if (it.description.isNotBlank()) "  \u2013 ${it.description}" else "" })
-        total.text = "Total : %.2f EUR (%d tickets)".format(Locale.US, items.sumOf { it.amount }, items.size)
+        total.text = if (query.isBlank()) "Total : %.2f EUR (%d tickets)".format(Locale.US, items.sumOf { it.amount }, items.size)
+                     else "R\u00e9sultat : %.2f EUR (%d sur %d tickets)".format(Locale.US, items.sumOf { it.amount }, items.size, all.size)
     }
 
     override fun onResume() {
