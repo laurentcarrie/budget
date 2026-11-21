@@ -3,26 +3,26 @@
 Android app that scans a card payment receipt with the camera, finds the **amount**, the **shop** and the **date**,
 stores the ticket locally, and keeps several devices (phone, tablet) in sync through an S3 bucket.
 
-Everything runs on the device: the text recognition is Google ML Kit with a bundled model (no network, no AI
-service). The only network calls are the sync, when you press **Sync** and once when the app opens.
+The screens, dialogs and messages are in French. Everything runs on the device: the text recognition is Google ML Kit with a bundled model (no network, no AI
+service). The only network calls are the sync, when you press **Synchro** and once when the app opens.
 
 ## How it works
 
-1. **Scan ticket** takes a photo. The text is read three times (full, half and quarter size) and the results are
+1. **Scanner un ticket** takes a photo. The text is read three times (full, half and quarter size) and the results are
    combined.
 2. A dialog shows the photo with the guessed **date**, **shop** and **amount**. Correct them if needed and press
-   **Save**. The photo is shown so the amount can be checked against the paper (the OCR sometimes confuses a bold
+   **Enregistrer**. The photo is shown so the amount can be checked against the paper (the OCR sometimes confuses a bold
    `0` with an `8`).
 3. Tickets are stored in a local SQLite database. The photo stays in the app private storage.
 4. Tap a ticket to correct its date, shop or amount (the shop field proposes the known shops), or to delete it;
    a long press deletes it directly.
-5. No ticket to scan? **Speak** asks for the amount, then for the shop, in French (for example "quatorze euros
+5. No ticket to scan? **Parler** asks for the amount, then for the shop, in French (for example "quatorze euros
    quatre-vingts", then "chez Carbone"). The same dialog opens prefilled, with what was heard; the ticket has no photo.
    The recognition is Android's speech service: it uses the offline French pack when it is installed (Google speech
    settings), otherwise it sends the audio to Google. `Spoken.kt` turns the French words or digits into an amount
    (`14 euros 80`, `14,80`, `douze cinquante`, `quatre-vingt-dix-neuf euros`) and the shop into a known shop when it
    matches.
-6. **Sync** pushes what changed on this device and pulls what the other devices pushed (see below). A ✓ means the
+6. **Synchro** pushes what changed on this device and pulls what the other devices pushed (see below). A ✓ means the
    ticket is in sync. Edits and deletes reach the other devices at their next sync; saving an edit also starts a sync.
 
 The parser (`Parser.kt`) is plain Kotlin:
@@ -74,7 +74,7 @@ With several devices connected, add `SERIAL=<serial>` (see `adb devices`).
 
 Each ticket is two objects under the configured prefix: `<uid>.jpg` (the photo) and `<uid>.json` (date, shop, amount,
 `deleted`, `updatedAt`). The `uid` is the photo file name, `ticket_<epochMs>_<4 hex of the install>`, so two devices
-never collide. A **Sync** (button, and once when the app opens) does:
+never collide. A **Synchro** (button, and once when the app opens) does:
 
 1. **push**: every ticket changed here (new, or deleted) is uploaded; a delete is a `.json` with `deleted: true`, so
    no S3 delete permission is needed
@@ -105,7 +105,7 @@ two ways:
 - **USB**: `make push-key` copies `key_id` and `secret` from `aws.properties` to the app external files folder with
   `adb push`. The app imports the file when it comes to the foreground, then deletes it. It works for debug and
   release builds, and the secret never shows on screen.
-- **By hand**: the **Settings** button takes the key ID and the secret (paste into the password field).
+- **By hand**: the **Réglages** button takes the key ID and the secret (paste into the password field).
 
 Rotate the key: create a new one with `aws iam create-access-key`, update `aws.properties`, run `make push-key`, then
 `aws iam delete-access-key` for the old one.

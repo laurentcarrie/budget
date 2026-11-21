@@ -3,9 +3,9 @@
     android:layout_width="match_parent" android:layout_height="wrap_content"
     android:orientation="vertical" android:padding="16dp">
     <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="AWS access key used to upload tickets" />
-    <EditText android:id="@+id/key_id" android:hint="Access key ID (20 characters, AKIA...)"
+        android:text="Clé d'accès AWS utilisée pour synchroniser les tickets" />
+    <EditText android:id="@+id/key_id" android:hint="Identifiant de la clé d'accès (20 caractères, AKIA...)"
         android:inputType="textNoSuggestions" android:layout_width="match_parent" android:layout_height="wrap_content" />
-    <EditText android:id="@+id/secret" android:hint="Secret access key (40 characters)"
+    <EditText android:id="@+id/secret" android:hint="Clé secrète d'accès (40 caractères)"
         android:inputType="textPassword" android:layout_width="match_parent" android:layout_height="wrap_content" />
 </LinearLayout>

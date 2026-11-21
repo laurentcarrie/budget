@@ -14,7 +14,7 @@ data class RemoteTicket(val uid: String, val date: String, val shop: String, val
 object Sync {
     data class Result(val sent: Int, val received: Int, val deleted: Int) {
         val changed get() = sent + received + deleted > 0
-        override fun toString() = "sent $sent, received $received, deleted $deleted"
+        override fun toString() = "envoy\u00e9s $sent, re\u00e7us $received, supprim\u00e9s $deleted"
     }
 
     enum class Action { INSERT, TOMBSTONE, APPLY_UPDATE, APPLY_DELETE, KEEP }

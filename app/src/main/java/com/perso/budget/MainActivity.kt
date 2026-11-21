@@ -60,9 +60,9 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(code, p, r)
         val granted = r.firstOrNull() == PackageManager.PERMISSION_GRANTED
         when {
-            code == 2 -> if (granted) speak() else toast("The microphone permission is required for voice entry")
+            code == 2 -> if (granted) speak() else toast("L'autorisation du micro est n\u00e9cessaire pour la saisie vocale")
             granted -> startCamera()
-            else -> toast("Camera permission is required")
+            else -> toast("L'autorisation de la cam\u00e9ra est n\u00e9cessaire")
         }
     }
 
@@ -85,12 +85,12 @@ class MainActivity : AppCompatActivity() {
         ic.takePicture(ImageCapture.OutputFileOptions.Builder(file).build(),
             ContextCompat.getMainExecutor(this), object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(o: ImageCapture.OutputFileResults) { recognize(file) }
-                override fun onError(e: ImageCaptureException) { toast("Capture failed: ${e.message}") }
+                override fun onError(e: ImageCaptureException) { toast("\u00c9chec de la capture : ${e.message}") }
             })
     }
 
     private fun recognize(file: File) {
-        toast("Reading ticket...")
+        toast("Lecture du ticket...")
         // Big bold digits are often misread at full size: also try downscaled versions and vote.
         val inputs = listOf(1 to 0f, 2 to 0f, 4 to 0f).mapNotNull { (scale, c) ->
             try { variant(file, scale, c) } catch (e: Exception) { Log.w("Budget", "variant $scale/$c failed", e); null }
@@ -167,41 +167,41 @@ class MainActivity : AppCompatActivity() {
 
     private fun confirm(file: File, shop: String, amount: Double?, date: String?) {
         val v = ticketView(file, date ?: now(), shop, amount)
-        AlertDialog.Builder(this).setTitle("Check and save").setView(v)
-            .setPositiveButton("Save") { _, _ ->
+        AlertDialog.Builder(this).setTitle("V\u00e9rifier et enregistrer").setView(v)
+            .setPositiveButton("Enregistrer") { _, _ ->
                 val f = fields(v, now())
-                if (!db.insert(file.nameWithoutExtension, f.date, f.shop, f.amount, file.absolutePath)) toast("This ticket is already saved")
+                if (!db.insert(file.nameWithoutExtension, f.date, f.shop, f.amount, file.absolutePath)) toast("Ce ticket est d\u00e9j\u00e0 enregistr\u00e9")
                 refresh()
             }
-            .setNegativeButton("Discard") { _, _ -> file.delete() }
+            .setNegativeButton("Abandonner") { _, _ -> file.delete() }
             .setCancelable(false).show()
     }
 
     /** Tap on a ticket: change its date, shop or amount, or delete it. The change reaches the other devices at the next sync. */
     private fun edit(r: Receipt) {
         val v = ticketView(File(r.photo), r.date, r.shop, r.amount)
-        AlertDialog.Builder(this).setTitle("Edit ticket").setView(v)
-            .setPositiveButton("Save") { _, _ ->
+        AlertDialog.Builder(this).setTitle("Modifier le ticket").setView(v)
+            .setPositiveButton("Enregistrer") { _, _ ->
                 val f = fields(v, r.date)
                 if (f.date != r.date || f.shop != r.shop || f.amount != r.amount) {
                     db.update(r.id, f.date, f.shop, f.amount); refresh(); sync(true)
                 }
             }
-            .setNeutralButton("Delete") { _, _ -> confirmDelete(r) }
-            .setNegativeButton("Cancel", null).show()
+            .setNeutralButton("Supprimer") { _, _ -> confirmDelete(r) }
+            .setNegativeButton("Annuler", null).show()
     }
 
     private fun confirmDelete(r: Receipt) {
-        AlertDialog.Builder(this).setMessage("Delete this entry?")
-            .setPositiveButton("Delete") { _, _ -> File(r.photo).delete(); db.softDelete(r.id); refresh() }
-            .setNegativeButton("Cancel", null).show()
+        AlertDialog.Builder(this).setMessage("Supprimer ce ticket ?")
+            .setPositiveButton("Supprimer") { _, _ -> File(r.photo).delete(); db.softDelete(r.id); refresh() }
+            .setNegativeButton("Annuler", null).show()
     }
 
     private fun refresh() {
         items = db.all()
         list.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1,
             items.map { "${if (it.uploaded) "\u2713 " else ""}${it.date}  ${it.shop}  %.2f EUR".format(Locale.US, it.amount) })
-        total.text = "Total: %.2f EUR (%d tickets)".format(Locale.US, items.sumOf { it.amount }, items.size)
+        total.text = "Total : %.2f EUR (%d tickets)".format(Locale.US, items.sumOf { it.amount }, items.size)
     }
 
     override fun onResume() {
@@ -223,9 +223,9 @@ class MainActivity : AppCompatActivity() {
         try {
             val p = java.util.Properties().apply { f.inputStream().use { load(it) } }
             val id = p.getProperty("key_id", "").trim(); val sec = p.getProperty("secret", "").trim()
-            if (id.length == 20 && sec.length == 40) { S3.save(this, id, sec); toast("AWS key imported") }
-            else toast("aws-key.properties ignored: key ID must be 20 and secret 40 characters")
-        } catch (e: Exception) { toast("Key import failed: ${e.message}") }
+            if (id.length == 20 && sec.length == 40) { S3.save(this, id, sec); toast("Cl\u00e9 AWS import\u00e9e") }
+            else toast("aws-key.properties ignor\u00e9 : l'identifiant doit faire 20 caract\u00e8res et le secret 40")
+        } catch (e: Exception) { toast("\u00c9chec de l'import de la cl\u00e9 : ${e.message}") }
         finally { f.delete() }
     }
 
@@ -234,22 +234,22 @@ class MainActivity : AppCompatActivity() {
         val v = LayoutInflater.from(this).inflate(R.layout.dialog_settings, null)
         v.findViewById<EditText>(R.id.key_id).setText(cfg.keyId)
         v.findViewById<EditText>(R.id.secret).hint =
-            if (cfg.secret.isEmpty()) "Secret access key (40 characters)" else "Secret saved (type to replace)"
-        AlertDialog.Builder(this).setTitle("Settings").setView(v)
-            .setPositiveButton("Save") { _, _ ->
+            if (cfg.secret.isEmpty()) "Cl\u00e9 secr\u00e8te d'acc\u00e8s (40 caract\u00e8res)" else "Secret enregistr\u00e9 (saisir pour remplacer)"
+        AlertDialog.Builder(this).setTitle("R\u00e9glages").setView(v)
+            .setPositiveButton("Enregistrer") { _, _ ->
                 val id = v.findViewById<EditText>(R.id.key_id).text.toString().trim()
                 val sec = v.findViewById<EditText>(R.id.secret).text.toString().trim().ifEmpty { cfg.secret }
-                if (id.length != 20 || sec.length != 40) toast("Key ID must be 20 and secret 40 characters")
-                else { S3.save(this, id, sec); toast("Saved") }
+                if (id.length != 20 || sec.length != 40) toast("L'identifiant doit faire 20 caract\u00e8res et le secret 40")
+                else { S3.save(this, id, sec); toast("Enregistr\u00e9") }
             }
-            .setNegativeButton("Cancel", null).show()
+            .setNegativeButton("Annuler", null).show()
     }
 
     private fun sync(auto: Boolean) {
         val cfg = S3.Config(this)
-        if (!cfg.configured) { if (!auto) { toast("Enter the AWS key first"); settings() }; return }
+        if (!cfg.configured) { if (!auto) { toast("Saisissez d'abord la cl\u00e9 AWS"); settings() }; return }
         if (!syncing.compareAndSet(false, true)) return
-        if (!auto) toast("Syncing...")
+        if (!auto) toast("Synchronisation...")
         Thread {
             var result: Sync.Result? = null; var error: String? = null
             try { result = Sync.run(cfg, db, filesDir) }
@@ -258,9 +258,9 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 refresh()
                 when {
-                    error != null -> if (!auto) toast("Sync failed: $error")
-                    result!!.changed -> toast("Sync: $result")
-                    !auto -> toast("Already in sync")
+                    error != null -> if (!auto) toast("\u00c9chec de la synchronisation : $error")
+                    result!!.changed -> toast("Synchro : $result")
+                    !auto -> toast("D\u00e9j\u00e0 synchronis\u00e9")
                 }
             }
         }.start()
@@ -276,7 +276,7 @@ class MainActivity : AppCompatActivity() {
     private var useOffline = true
 
     private fun speak() {
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) { toast("No speech recognition on this device"); return }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) { toast("Pas de reconnaissance vocale sur cet appareil"); return }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 2); return
         }
@@ -316,16 +316,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun listen(amountStep: Boolean, offline: Boolean) {
         val r = speech ?: return
-        val example = if (amountStep) "Say the amount in French, for example: \u00ab quatorze euros quatre-vingts \u00bb"
-                      else "Say the shop in French, for example: \u00ab chez Carbone \u00bb"
+        val example = if (amountStep) "Dites le montant, par exemple : \u00ab quatorze euros quatre-vingts \u00bb"
+                      else "Dites le magasin, par exemple : \u00ab chez Carbone \u00bb"
         listening?.dismiss()
-        listening = AlertDialog.Builder(this).setTitle(if (amountStep) "Amount" else "Shop").setMessage("Starting...\n\n$example")
-            .setNegativeButton("Cancel") { _, _ -> endSession() }.setCancelable(false).show()
+        listening = AlertDialog.Builder(this).setTitle(if (amountStep) "Montant" else "Magasin").setMessage("D\u00e9marrage...\n\n$example")
+            .setNegativeButton("Annuler") { _, _ -> endSession() }.setCancelable(false).show()
         fun status(s: String) = runOnUiThread { listening?.setMessage("$s\n\n$example") }
         r.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) = status("Speak now")
-            override fun onBeginningOfSpeech() = status("Hearing you...")
-            override fun onEndOfSpeech() = status("Processing...")
+            override fun onReadyForSpeech(params: Bundle?) = status("Parlez maintenant")
+            override fun onBeginningOfSpeech() = status("Je vous \u00e9coute...")
+            override fun onEndOfSpeech() = status("Analyse...")
             override fun onResults(results: Bundle?) {
                 val words = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
                 Log.d("Budget", "speech heard (offline=$offline): $words")
@@ -338,7 +338,7 @@ class MainActivity : AppCompatActivity() {
                 // No French offline pack (12, 13) or the offline model understood nothing (7): once, try online
                 if (offline && (error == 12 || error == 13 || error == 7)) {
                     useOffline = false
-                    toast("Offline French did not work, trying online: speak again")
+                    toast("Le fran\u00e7ais hors ligne n'a pas march\u00e9, essai en ligne : parlez \u00e0 nouveau")
                     r.cancel(); listen(amountStep, false)
                 } else { endSession(); toast("${speechError(error)} ($error)") }
             }
@@ -356,22 +356,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun speechError(code: Int) = when (code) {
-        SpeechRecognizer.ERROR_NO_MATCH -> "Not understood, try again"
-        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech heard, try again closer to the microphone"
-        SpeechRecognizer.ERROR_AUDIO -> "The microphone could not be read"
-        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "The speech service is busy, try again"
+        SpeechRecognizer.ERROR_NO_MATCH -> "Pas compris, r\u00e9essayez"
+        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Rien entendu, r\u00e9essayez plus pr\u00e8s du micro"
+        SpeechRecognizer.ERROR_AUDIO -> "Le micro n'a pas pu \u00eatre lu"
+        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Le service vocal est occup\u00e9, r\u00e9essayez"
         SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT, SpeechRecognizer.ERROR_SERVER ->
-            "No network and no offline French pack: install it in the Google speech settings"
-        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "The microphone permission is required"
-        else -> "Speech recognition failed ($code)"
+            "Pas de r\u00e9seau et pas de pack fran\u00e7ais hors ligne : installez-le dans les r\u00e9glages vocaux Google"
+        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "L'autorisation du micro est n\u00e9cessaire"
+        else -> "\u00c9chec de la reconnaissance vocale ($code)"
     }
 
     private fun heard(amountStep: Boolean, words: List<String>) {
-        if (words.isEmpty()) { endSession(); toast("Nothing understood, try again"); return }
+        if (words.isEmpty()) { endSession(); toast("Rien compris, r\u00e9essayez"); return }
         if (amountStep) {
             spokenAmount = words.firstNotNullOfOrNull { Spoken.amount(it) }
             heard = "\u00ab ${words.first()} \u00bb"
-            if (spokenAmount == null) toast("Amount not understood, you can type it")
+            if (spokenAmount == null) toast("Montant non compris, vous pouvez le saisir")
             speech?.cancel(); listen(false, useOffline)
         } else {
             heard += "  \u00ab ${words.first()} \u00bb"
@@ -383,13 +383,13 @@ class MainActivity : AppCompatActivity() {
     /** The ticket said aloud has no photo: it is saved like the others, and synced. */
     private fun confirmSpoken(shop: String, amount: Double?) {
         val v = ticketView(File(""), now(), shop, amount)
-        AlertDialog.Builder(this).setTitle("Check and save").setMessage("Heard: $heard").setView(v)
-            .setPositiveButton("Save") { _, _ ->
+        AlertDialog.Builder(this).setTitle("V\u00e9rifier et enregistrer").setMessage("J'ai entendu : $heard").setView(v)
+            .setPositiveButton("Enregistrer") { _, _ ->
                 val f = fields(v, now())
                 db.insert("ticket_${System.currentTimeMillis()}_${deviceSuffix()}", f.date, f.shop, f.amount, "")
                 refresh(); sync(true)
             }
-            .setNegativeButton("Cancel", null).setCancelable(false).show()
+            .setNegativeButton("Annuler", null).setCancelable(false).show()
     }
 
     override fun onDestroy() { endSession(); super.onDestroy() }
