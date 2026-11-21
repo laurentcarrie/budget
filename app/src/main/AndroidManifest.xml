@@ -7,7 +7,7 @@
         <intent><action android:name="android.speech.RecognitionService" /></intent>
     </queries>
     <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <application android:allowBackup="false" android:label="laurent-budget" android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
+    <application android:allowBackup="false" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:label="laurent-budget" android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

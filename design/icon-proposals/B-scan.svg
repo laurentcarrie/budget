@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<defs><clipPath id="m"><rect width="512" height="512" rx="112"/></clipPath></defs>
+<g clip-path="url(#m)">
+<rect width="512" height="512" fill="#00796B"/>
+<path d="M96,166 V96 H166" fill="none" stroke="#FFFFFF" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/><path d="M416,166 V96 H346" fill="none" stroke="#FFFFFF" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/><path d="M96,346 V416 H166" fill="none" stroke="#FFFFFF" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/><path d="M416,346 V416 H346" fill="none" stroke="#FFFFFF" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M196,150 H316 V340 L306.0,360 L296.0,340 L286.0,360 L276.0,340 L266.0,360 L256.0,340 L246.0,360 L236.0,340 L226.0,360 L216.0,340 L206.0,360 L196.0,340 Z" fill="#FFFFFF"/>
+<rect x="216" y="176" width="80" height="10" rx="5" fill="#B2DFDB"/>
+<rect x="216" y="200" width="56" height="10" rx="5" fill="#B2DFDB"/>
+<text x="256" y="304" font-family="DejaVu Sans, sans-serif" font-weight="bold" font-size="64" text-anchor="middle" fill="#00796B">&#8364;</text>
+<rect x="120" y="248" width="272" height="8" rx="4" fill="#FFEB3B" opacity="0.9"/>
+</g>
+</svg>
