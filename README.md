@@ -16,7 +16,13 @@ service). The only network calls are the sync, when you press **Sync** and once 
 3. Tickets are stored in a local SQLite database. The photo stays in the app private storage.
 4. Tap a ticket to correct its date, shop or amount (the shop field proposes the known shops), or to delete it;
    a long press deletes it directly.
-5. **Sync** pushes what changed on this device and pulls what the other devices pushed (see below). A ✓ means the
+5. No ticket to scan? **Speak** asks for the amount, then for the shop, in French (for example "quatorze euros
+   quatre-vingts", then "chez Carbone"). The same dialog opens prefilled, with what was heard; the ticket has no photo.
+   The recognition is Android's speech service: it uses the offline French pack when it is installed (Google speech
+   settings), otherwise it sends the audio to Google. `Spoken.kt` turns the French words or digits into an amount
+   (`14 euros 80`, `14,80`, `douze cinquante`, `quatre-vingt-dix-neuf euros`) and the shop into a known shop when it
+   matches.
+6. **Sync** pushes what changed on this device and pulls what the other devices pushed (see below). A ✓ means the
    ticket is in sync. Edits and deletes reach the other devices at their next sync; saving an edit also starts a sync.
 
 The parser (`Parser.kt`) is plain Kotlin:

@@ -8,6 +8,9 @@
         <Button android:id="@+id/capture" android:text="Scan ticket"
             android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:layout_gravity="bottom|center_horizontal" android:layout_margin="16dp" />
+        <Button android:id="@+id/speak" android:text="Speak"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_gravity="bottom|start" android:layout_margin="16dp" />
     </FrameLayout>
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="horizontal" android:gravity="center_vertical">

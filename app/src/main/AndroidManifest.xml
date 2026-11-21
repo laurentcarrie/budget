@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <queries>
+        <intent><action android:name="android.speech.RecognitionService" /></intent>
+    </queries>
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application android:allowBackup="false" android:label="laurent-budget" android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
         <activity android:name=".MainActivity" android:exported="true">

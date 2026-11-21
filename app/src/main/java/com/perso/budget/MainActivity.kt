@@ -2,7 +2,11 @@ package com.perso.budget
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.Intent
 import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.util.Log
 import android.view.LayoutInflater
 import android.widget.*
@@ -40,6 +44,7 @@ class MainActivity : AppCompatActivity() {
         list.setOnItemClickListener { _, _, pos, _ -> edit(items[pos]) }
         list.setOnItemLongClickListener { _, _, pos, _ -> confirmDelete(items[pos]); true }
         findViewById<Button>(R.id.capture).setOnClickListener { capture() }
+        findViewById<Button>(R.id.speak).setOnClickListener { speak() }
         findViewById<Button>(R.id.upload).setOnClickListener { sync(false) }
         findViewById<Button>(R.id.settings).setOnClickListener { settings() }
         refresh()
@@ -50,8 +55,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(code: Int, p: Array<out String>, r: IntArray) {
         super.onRequestPermissionsResult(code, p, r)
-        if (r.firstOrNull() == PackageManager.PERMISSION_GRANTED) startCamera()
-        else toast("Camera permission is required")
+        val granted = r.firstOrNull() == PackageManager.PERMISSION_GRANTED
+        when {
+            code == 2 -> if (granted) speak() else toast("The microphone permission is required for voice entry")
+            granted -> startCamera()
+            else -> toast("Camera permission is required")
+        }
     }
 
     private fun startCamera() {
@@ -253,6 +262,90 @@ class MainActivity : AppCompatActivity() {
             }
         }.start()
     }
+
+    // ---- Voice entry, in French, in two steps: the amount, then the shop ----
+    private var speech: SpeechRecognizer? = null
+    private var listening: AlertDialog? = null
+    private var spokenAmount: Double? = null
+    private var heard = ""
+
+    private fun speak() {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) { toast("No speech recognition on this device"); return }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 2); return
+        }
+        spokenAmount = null; heard = ""
+        listen(true)
+    }
+
+    private fun listen(amountStep: Boolean) {
+        val r = SpeechRecognizer.createSpeechRecognizer(this)
+        speech = r
+        listening = AlertDialog.Builder(this).setTitle(if (amountStep) "Amount" else "Shop")
+            .setMessage(if (amountStep) "Say the amount in French, for example: \u00ab quatorze euros quatre-vingts \u00bb"
+                        else "Say the shop in French, for example: \u00ab chez Carbone \u00bb")
+            .setNegativeButton("Cancel") { _, _ -> stopListening() }.setCancelable(false).show()
+        r.setRecognitionListener(object : RecognitionListener {
+            override fun onResults(results: Bundle?) {
+                val words = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
+                stopListening(); heard(amountStep, words)
+            }
+            override fun onError(error: Int) { stopListening(); toast(speechError(error)) }
+            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {}
+            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+        r.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR")
+            .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true) // the French offline pack when installed, else online
+            .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            .putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName))
+    }
+
+    private fun stopListening() {
+        listening?.dismiss(); listening = null
+        speech?.destroy(); speech = null
+    }
+
+    private fun speechError(code: Int) = when (code) {
+        SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Nothing understood, try again"
+        SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT, SpeechRecognizer.ERROR_SERVER ->
+            "No network and no offline French pack: install it in the Google speech settings"
+        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "The microphone permission is required"
+        else -> "Speech recognition failed ($code)"
+    }
+
+    private fun heard(amountStep: Boolean, words: List<String>) {
+        if (words.isEmpty()) { toast("Nothing understood, try again"); return }
+        if (amountStep) {
+            spokenAmount = words.firstNotNullOfOrNull { Spoken.amount(it) }
+            heard = "\u00ab ${words.first()} \u00bb"
+            if (spokenAmount == null) toast("Amount not understood, you can type it")
+            listen(false)
+        } else {
+            heard += "  \u00ab ${words.first()} \u00bb"
+            confirmSpoken(Spoken.shop(words, db.shops()) ?: "", spokenAmount)
+        }
+    }
+
+    /** The ticket said aloud has no photo: it is saved like the others, and synced. */
+    private fun confirmSpoken(shop: String, amount: Double?) {
+        val v = ticketView(File(""), now(), shop, amount)
+        AlertDialog.Builder(this).setTitle("Check and save").setMessage("Heard: $heard").setView(v)
+            .setPositiveButton("Save") { _, _ ->
+                val f = fields(v, now())
+                db.insert("ticket_${System.currentTimeMillis()}_${deviceSuffix()}", f.date, f.shop, f.amount, "")
+                refresh(); sync(true)
+            }
+            .setNegativeButton("Cancel", null).setCancelable(false).show()
+    }
+
+    override fun onDestroy() { stopListening(); super.onDestroy() }
 
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_SHORT).show()
 }

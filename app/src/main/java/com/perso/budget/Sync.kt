@@ -4,7 +4,8 @@ import org.json.JSONObject
 import java.io.File
 
 /** A ticket as described by its <uid>.json object in S3. */
-data class RemoteTicket(val uid: String, val date: String, val shop: String, val amount: Double, val deleted: Boolean, val updatedAt: Long)
+data class RemoteTicket(val uid: String, val date: String, val shop: String, val amount: Double, val deleted: Boolean, val updatedAt: Long,
+                        val hasPhoto: Boolean = true)
 
 /**
  * Two-way sync of the tickets through the S3 prefix: push what changed here, then pull what the other devices
@@ -35,11 +36,11 @@ object Sync {
     fun parse(uid: String, json: String): RemoteTicket {
         val o = JSONObject(json)
         return RemoteTicket(uid, o.optString("date"), o.optString("shop"), o.optDouble("amount", 0.0),
-            o.optBoolean("deleted", false), o.optLong("updatedAt", 0))
+            o.optBoolean("deleted", false), o.optLong("updatedAt", 0), o.has("photo") && !o.isNull("photo"))
     }
 
     fun toJson(r: Receipt): String = JSONObject().put("uid", r.uid).put("date", r.date).put("shop", r.shop)
-        .put("amount", r.amount).put("currency", "EUR").put("photo", "${r.uid}.jpg")
+        .put("amount", r.amount).put("currency", "EUR").put("photo", if (r.photo.isEmpty()) JSONObject.NULL else "${r.uid}.jpg")
         .put("deleted", r.deleted).put("updatedAt", r.updatedAt).toString(2)
 
     /** Runs a full sync; throws on the first network or S3 error (what was done before stays done). */
@@ -61,7 +62,7 @@ object Sync {
             when (decide(mine, t)) {
                 Action.INSERT -> {
                     val photo = File(dir, "$uid.jpg")
-                    val path = try { photo.writeBytes(S3.get(cfg, "$uid.jpg")); photo.absolutePath }
+                    val path = if (!t.hasPhoto) "" else try { photo.writeBytes(S3.get(cfg, "$uid.jpg")); photo.absolutePath }
                     catch (e: java.io.IOException) { if (e.message?.startsWith("S3 404") == true) "" else throw e }
                     db.upsertRemote(uid, t.date, t.shop, t.amount, path, false, t.updatedAt, etag); received++
                 }
