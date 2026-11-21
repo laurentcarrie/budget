@@ -29,10 +29,13 @@ service). The only network calls are the sync, when you press **Synchro** and on
    matches.
    A date can be said with the amount or the shop and is taken out of the words before they are read: "hier",
    "avant-hier", "le 7 novembre", "samedi dernier", "il y a deux jours" (the ticket then has that day, without a time).
-7. The search field above the list filters the tickets as you type. Every word must be found in the date, shop,
+7. In the list each field has its own light-coloured cell: date (blue), shop (green), amount (yellow), and on a
+   second line the category (orange) and the description (purple), when there are some. A green check means the
+   ticket is synced, a hollow circle that it waits for the next sync.
+8. The search field above the list filters the tickets as you type. Every word must be found in the date, shop,
    amount or description; case, accents and emoji do not matter, a word can be cut short and a word of three letters
    or more can have a typo ("boulangrie" finds "boulangerie"). The total shows the result of the search.
-8. **Synchro** pushes what changed on this device and pulls what the other devices pushed (see below). A ✓ means the
+9. **Synchro** pushes what changed on this device and pulls what the other devices pushed (see below). A ✓ means the
    ticket is in sync. Edits and deletes reach the other devices at their next sync; saving an edit also starts a sync.
 
 The parser (`Parser.kt`) is plain Kotlin:

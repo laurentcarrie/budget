@@ -245,10 +245,29 @@ class MainActivity : AppCompatActivity() {
     private fun refresh() {
         val all = db.all()
         items = all.filter { Search.matches(query, it) }
-        list.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1,
-            items.map { "${if (it.uploaded) "\u2713 " else ""}${it.date}  ${it.shop}  %.2f EUR".format(Locale.US, it.amount) +
-                (if (it.category.isNotBlank()) "  [${it.category}]" else "") +
-                if (it.description.isNotBlank()) "  \u2013 ${it.description}" else "" })
+        // One row per ticket, each field in its own light-coloured cell (see item_ticket.xml).
+        list.adapter = object : ArrayAdapter<Receipt>(this, R.layout.item_ticket, items) {
+            override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                val v = convertView ?: LayoutInflater.from(context).inflate(R.layout.item_ticket, parent, false)
+                val r = getItem(position)!!
+                v.findViewById<TextView>(R.id.row_sync).apply {
+                    text = if (r.uploaded) "\u2713" else "\u25CB" // synced / waiting for the next sync
+                    setTextColor(if (r.uploaded) 0xFF2E7D32.toInt() else 0xFFEF6C00.toInt())
+                }
+                v.findViewById<TextView>(R.id.row_date).text = r.date
+                v.findViewById<TextView>(R.id.row_shop).text = r.shop
+                v.findViewById<TextView>(R.id.row_amount).text = "%.2f EUR".format(Locale.US, r.amount)
+                v.findViewById<TextView>(R.id.row_category).apply {
+                    text = r.category; visibility = if (r.category.isBlank()) android.view.View.GONE else android.view.View.VISIBLE
+                }
+                v.findViewById<TextView>(R.id.row_description).apply {
+                    text = r.description; visibility = if (r.description.isBlank()) android.view.View.GONE else android.view.View.VISIBLE
+                }
+                v.findViewById<android.view.View>(R.id.row_line2).visibility =
+                    if (r.category.isBlank() && r.description.isBlank()) android.view.View.GONE else android.view.View.VISIBLE
+                return v
+            }
+        }
         total.text = if (query.isBlank()) "Total : %.2f EUR (%d tickets)".format(Locale.US, items.sumOf { it.amount }, items.size)
                      else "R\u00e9sultat : %.2f EUR (%d sur %d tickets)".format(Locale.US, items.sumOf { it.amount }, items.size, all.size)
     }
