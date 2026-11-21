@@ -14,8 +14,10 @@ service). The only network calls are the sync, when you press **Sync** and once 
    **Save**. The photo is shown so the amount can be checked against the paper (the OCR sometimes confuses a bold
    `0` with an `8`).
 3. Tickets are stored in a local SQLite database. The photo stays in the app private storage.
-4. **Sync** pushes what changed on this device and pulls what the other devices pushed (see below). A ✓ means the
-   ticket is in sync. Long-press a ticket to delete it; the delete reaches the other devices at their next sync.
+4. Tap a ticket to correct its date, shop or amount (the shop field proposes the known shops), or to delete it;
+   a long press deletes it directly.
+5. **Sync** pushes what changed on this device and pulls what the other devices pushed (see below). A ✓ means the
+   ticket is in sync. Edits and deletes reach the other devices at their next sync; saving an edit also starts a sync.
 
 The parser (`Parser.kt`) is plain Kotlin:
 

@@ -77,6 +77,12 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "budget.db", null, 3) {
             put("uploaded", 0); put("updated_at", System.currentTimeMillis()); put("deleted", 0)
         }, SQLiteDatabase.CONFLICT_IGNORE) != -1L
 
+    /** A manual correction: marks the ticket as not in sync so the next sync pushes it. */
+    fun update(id: Long, date: String, shop: String, amount: Double) {
+        writableDatabase.execSQL("UPDATE receipt SET date=?, shop=?, amount=?, uploaded=0, updated_at=? WHERE id=?",
+            arrayOf(date, shop, amount, System.currentTimeMillis(), id))
+    }
+
     /** Hides the ticket and keeps a deleted row to tell the other devices. */
     fun softDelete(id: Long) {
         writableDatabase.execSQL("UPDATE receipt SET deleted=1, uploaded=0, updated_at=? WHERE id=?", arrayOf(System.currentTimeMillis(), id))

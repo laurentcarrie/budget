@@ -37,12 +37,8 @@ class MainActivity : AppCompatActivity() {
         db = Db(this)
         list = findViewById(R.id.list)
         total = findViewById(R.id.total)
-        list.setOnItemLongClickListener { _, _, pos, _ ->
-            AlertDialog.Builder(this).setMessage("Delete this entry?")
-                .setPositiveButton("Delete") { _, _ -> File(items[pos].photo).delete(); db.softDelete(items[pos].id); refresh() }
-                .setNegativeButton("Cancel", null).show()
-            true
-        }
+        list.setOnItemClickListener { _, _, pos, _ -> edit(items[pos]) }
+        list.setOnItemLongClickListener { _, _, pos, _ -> confirmDelete(items[pos]); true }
         findViewById<Button>(R.id.capture).setOnClickListener { capture() }
         findViewById<Button>(R.id.upload).setOnClickListener { sync(false) }
         findViewById<Button>(R.id.settings).setOnClickListener { settings() }
@@ -130,11 +126,14 @@ class MainActivity : AppCompatActivity() {
         return InputImage.fromBitmap(bmp, deg)
     }
 
-    private fun confirm(file: File, shop: String, amount: Double?, date: String?) {
+    /** The dialog fields (photo, date, shop with its dropdown of known shops, amount) shared by Save and Edit. */
+    private fun ticketView(photo: File, date: String, shop: String, amount: Double?): android.view.View {
         val v = LayoutInflater.from(this).inflate(R.layout.dialog_confirm, null)
-        v.findViewById<android.widget.ImageView>(R.id.photo).setImageBitmap(
-            android.graphics.BitmapFactory.decodeFile(file.absolutePath, android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }))
-        v.findViewById<EditText>(R.id.date).setText(date ?: SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date()))
+        val img = v.findViewById<android.widget.ImageView>(R.id.photo)
+        if (photo.exists()) img.setImageBitmap(
+            android.graphics.BitmapFactory.decodeFile(photo.absolutePath, android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }))
+        else img.visibility = android.view.View.GONE
+        v.findViewById<EditText>(R.id.date).setText(date)
         val shopField = v.findViewById<AutoCompleteTextView>(R.id.shop)
         shopField.setAdapter(ShopAdapter(this, db.shops().filter { it.isNotBlank() && it != "Unknown" }, shop))
         shopField.setText(shop)
@@ -142,16 +141,48 @@ class MainActivity : AppCompatActivity() {
         shopField.setOnClickListener { shopField.showDropDown() }
         shopField.setOnFocusChangeListener { _, focused -> if (focused) shopField.showDropDown() }
         v.findViewById<EditText>(R.id.amount).setText(amount?.let { "%.2f".format(Locale.US, it) } ?: "")
+        return v
+    }
+
+    private class Fields(val date: String, val shop: String, val amount: Double)
+
+    private fun fields(v: android.view.View, fallbackDate: String) = Fields(
+        v.findViewById<EditText>(R.id.date).text.toString().trim().ifBlank { fallbackDate },
+        v.findViewById<AutoCompleteTextView>(R.id.shop).text.toString().trim().ifBlank { "Unknown" },
+        v.findViewById<EditText>(R.id.amount).text.toString().replace(',', '.').toDoubleOrNull() ?: 0.0)
+
+    private fun now() = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
+
+    private fun confirm(file: File, shop: String, amount: Double?, date: String?) {
+        val v = ticketView(file, date ?: now(), shop, amount)
         AlertDialog.Builder(this).setTitle("Check and save").setView(v)
             .setPositiveButton("Save") { _, _ ->
-                val a = v.findViewById<EditText>(R.id.amount).text.toString().replace(',', '.').toDoubleOrNull() ?: 0.0
-                val s = v.findViewById<AutoCompleteTextView>(R.id.shop).text.toString().trim().ifBlank { "Unknown" }
-                if (!db.insert(file.nameWithoutExtension, v.findViewById<EditText>(R.id.date).text.toString().trim(), s, a, file.absolutePath))
-                    toast("This ticket is already saved")
+                val f = fields(v, now())
+                if (!db.insert(file.nameWithoutExtension, f.date, f.shop, f.amount, file.absolutePath)) toast("This ticket is already saved")
                 refresh()
             }
             .setNegativeButton("Discard") { _, _ -> file.delete() }
             .setCancelable(false).show()
+    }
+
+    /** Tap on a ticket: change its date, shop or amount, or delete it. The change reaches the other devices at the next sync. */
+    private fun edit(r: Receipt) {
+        val v = ticketView(File(r.photo), r.date, r.shop, r.amount)
+        AlertDialog.Builder(this).setTitle("Edit ticket").setView(v)
+            .setPositiveButton("Save") { _, _ ->
+                val f = fields(v, r.date)
+                if (f.date != r.date || f.shop != r.shop || f.amount != r.amount) {
+                    db.update(r.id, f.date, f.shop, f.amount); refresh(); sync(true)
+                }
+            }
+            .setNeutralButton("Delete") { _, _ -> confirmDelete(r) }
+            .setNegativeButton("Cancel", null).show()
+    }
+
+    private fun confirmDelete(r: Receipt) {
+        AlertDialog.Builder(this).setMessage("Delete this entry?")
+            .setPositiveButton("Delete") { _, _ -> File(r.photo).delete(); db.softDelete(r.id); refresh() }
+            .setNegativeButton("Cancel", null).show()
     }
 
     private fun refresh() {
