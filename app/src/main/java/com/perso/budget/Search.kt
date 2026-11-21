@@ -38,5 +38,5 @@ object Search {
     }
 
     fun matches(query: String, r: Receipt) =
-        matches(query, "${r.date} ${r.shop} ${"%.2f".format(Locale.US, r.amount)} ${r.description}")
+        matches(query, "${r.date} ${r.shop} ${r.category} ${"%.2f".format(Locale.US, r.amount)} ${r.description}")
 }

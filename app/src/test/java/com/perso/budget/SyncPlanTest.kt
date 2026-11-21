@@ -61,4 +61,12 @@ class SyncPlanTest {
         val theirs = remote("a", 200).copy(description = "avec Paul")
         assertEquals(Sync.Action.APPLY_UPDATE, Sync.decide(mine, theirs))
     }
+
+    @Test fun categoryTravelsInTheJson() {
+        val r = local("ticket_9_ab12", updatedAt = 1234).copy(category = "p\u00e9age")
+        assertEquals("p\u00e9age", Sync.parse(r.uid, Sync.toJson(r)).category)
+    }
+
+    @Test fun jsonWithoutACategoryGivesAnEmptyOne() =
+        assertEquals("", Sync.parse("a", """{"date":"2026-11-20 23:52","shop":"CARBONE 14","amount":14,"updatedAt":5}""").category)
 }

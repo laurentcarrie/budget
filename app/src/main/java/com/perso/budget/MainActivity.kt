@@ -168,7 +168,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** The dialog fields (photo, date, shop with its dropdown of known shops, amount) shared by Save and Edit. */
-    private fun ticketView(photo: File, date: String, shop: String, amount: Double?, description: String = ""): android.view.View {
+    private fun ticketView(photo: File, date: String, shop: String, amount: Double?, description: String = "", category: String = ""): android.view.View {
         val v = LayoutInflater.from(this).inflate(R.layout.dialog_confirm, null)
         val img = v.findViewById<android.widget.ImageView>(R.id.photo)
         if (photo.exists()) img.setImageBitmap(
@@ -186,16 +186,27 @@ class MainActivity : AppCompatActivity() {
         shopField.setOnFocusChangeListener { _, focused -> if (focused) shopField.showDropDown() }
         v.findViewById<EditText>(R.id.amount).setText(amount?.let { "%.2f".format(Locale.US, it) } ?: "")
         v.findViewById<EditText>(R.id.description).setText(description)
+        val catField = v.findViewById<AutoCompleteTextView>(R.id.category)
+        val cat0 = category.ifBlank { if (shop.isNotBlank()) db.usualCategory(shop) else "" } // the usual category of this shop
+        catField.setAdapter(ShopAdapter(this, db.categories(), cat0))
+        catField.setText(cat0)
+        catField.dropDownHeight = (resources.displayMetrics.heightPixels * 0.30f).toInt()
+        catField.setOnClickListener { catField.showDropDown() }
+        catField.setOnFocusChangeListener { _, focused -> if (focused) catField.showDropDown() }
+        shopField.setOnItemClickListener { _, _, _, _ ->
+            if (catField.text.isBlank()) catField.setText(db.usualCategory(shopField.text.toString()))
+        }
         return v
     }
 
-    private class Fields(val date: String, val shop: String, val amount: Double, val description: String)
+    private class Fields(val date: String, val shop: String, val amount: Double, val description: String, val category: String)
 
     private fun fields(v: android.view.View, fallbackDate: String) = Fields(
         v.findViewById<EditText>(R.id.date).text.toString().trim().ifBlank { fallbackDate },
         Shops.canonical(v.findViewById<AutoCompleteTextView>(R.id.shop).text.toString(), db.shops()).ifBlank { "Unknown" },
         v.findViewById<EditText>(R.id.amount).text.toString().replace(',', '.').toDoubleOrNull() ?: 0.0,
-        v.findViewById<EditText>(R.id.description).text.toString().trim())
+        v.findViewById<EditText>(R.id.description).text.toString().trim(),
+        Shops.canonical(v.findViewById<AutoCompleteTextView>(R.id.category).text.toString(), db.categories()))
 
     private fun now() = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
 
@@ -204,7 +215,7 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this).setTitle("V\u00e9rifier et enregistrer").setView(v)
             .setPositiveButton("Enregistrer") { _, _ ->
                 val f = fields(v, now())
-                if (!db.insert(file.nameWithoutExtension, f.date, f.shop, f.amount, file.absolutePath, f.description)) toast("Ce ticket est d\u00e9j\u00e0 enregistr\u00e9")
+                if (!db.insert(file.nameWithoutExtension, f.date, f.shop, f.amount, file.absolutePath, f.description, f.category)) toast("Ce ticket est d\u00e9j\u00e0 enregistr\u00e9")
                 refresh()
             }
             .setNegativeButton("Abandonner") { _, _ -> file.delete() }
@@ -213,12 +224,12 @@ class MainActivity : AppCompatActivity() {
 
     /** Tap on a ticket: change its date, shop or amount, or delete it. The change reaches the other devices at the next sync. */
     private fun edit(r: Receipt) {
-        val v = ticketView(File(r.photo), r.date, r.shop, r.amount, r.description)
+        val v = ticketView(File(r.photo), r.date, r.shop, r.amount, r.description, r.category)
         AlertDialog.Builder(this).setTitle("Modifier le ticket").setView(v)
             .setPositiveButton("Enregistrer") { _, _ ->
                 val f = fields(v, r.date)
-                if (f.date != r.date || f.shop != r.shop || f.amount != r.amount || f.description != r.description) {
-                    db.update(r.id, f.date, f.shop, f.amount, f.description); refresh(); sync(true)
+                if (f.date != r.date || f.shop != r.shop || f.amount != r.amount || f.description != r.description || f.category != r.category) {
+                    db.update(r.id, f.date, f.shop, f.amount, f.description, f.category); refresh(); sync(true)
                 }
             }
             .setNeutralButton("Supprimer") { _, _ -> confirmDelete(r) }
@@ -236,6 +247,7 @@ class MainActivity : AppCompatActivity() {
         items = all.filter { Search.matches(query, it) }
         list.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1,
             items.map { "${if (it.uploaded) "\u2713 " else ""}${it.date}  ${it.shop}  %.2f EUR".format(Locale.US, it.amount) +
+                (if (it.category.isNotBlank()) "  [${it.category}]" else "") +
                 if (it.description.isNotBlank()) "  \u2013 ${it.description}" else "" })
         total.text = if (query.isBlank()) "Total : %.2f EUR (%d tickets)".format(Locale.US, items.sumOf { it.amount }, items.size)
                      else "R\u00e9sultat : %.2f EUR (%d sur %d tickets)".format(Locale.US, items.sumOf { it.amount }, items.size, all.size)
@@ -428,7 +440,7 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this).setTitle("V\u00e9rifier et enregistrer").setMessage("J'ai entendu : $heard").setView(v)
             .setPositiveButton("Enregistrer") { _, _ ->
                 val f = fields(v, now())
-                db.insert("ticket_${System.currentTimeMillis()}_${deviceSuffix()}", f.date, f.shop, f.amount, "", f.description)
+                db.insert("ticket_${System.currentTimeMillis()}_${deviceSuffix()}", f.date, f.shop, f.amount, "", f.description, f.category)
                 refresh(); sync(true)
             }
             .setNegativeButton("Annuler", null).setCancelable(false).show()

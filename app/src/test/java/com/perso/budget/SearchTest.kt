@@ -68,4 +68,11 @@ class SearchTest {
         assertFalse(Search.matches("zzzz", pub))
         assertFalse(Search.matches("restaurant", bakery))
     }
+
+    @Test fun theCategory() {
+        val toll = ticket("2026-11-10 08:00", "VINCI", 21.8).copy(category = "p\u00e9age")
+        assertTrue(Search.matches("peage", toll))
+        assertTrue(Search.matches("p\u00e9age", toll))
+        assertFalse(Search.matches("peage", pub))
+    }
 }

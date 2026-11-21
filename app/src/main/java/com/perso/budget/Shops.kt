@@ -7,6 +7,10 @@ import java.text.Normalizer
  * are the same shop. [distinct] gives one spelling per shop for the dropdown, [canonical] gives the spelling to save.
  */
 object Shops {
+    /** The categories offered before any ticket has one; the ones already used come first. */
+    val DEFAULT_CATEGORIES = listOf("alimentation", "restaurant", "pub", "p\u00e9age", "essence", "transport", "sant\u00e9",
+        "loisirs", "v\u00eatements", "maison", "cadeaux", "divers")
+
     /** What makes two names the same shop: letters and digits only, without case or accents. */
     fun key(s: String): String =
         Normalizer.normalize(s, Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "").lowercase().filter { it.isLetterOrDigit() }

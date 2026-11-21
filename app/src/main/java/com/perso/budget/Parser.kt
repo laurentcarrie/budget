@@ -33,7 +33,23 @@ object Parser {
         return lines.flatMap { nums(it) }.maxOrNull()
     }
 
+    private val dateLineRe = Regex("""(?i)^\s*le\s+\d{1,2}\s*[/.]\s*[0-9OIl]{1,2}\s*[/.]\s*\d{2,4}""")
+    private val footerWords = setOf("debit", "credit", "ticket", "client", "conserver", "comptant", "montant", "total", "net", "merci",
+        "carte", "bancaire", "contact", "paiement", "visa", "mastercard", "autorisation", "auto", "terminal", "transaction", "signature")
+
+    /** On card-terminal receipts the shop is printed under the "LE 14/11/26 A 17:56:36" line, before the footer. */
+    private fun belowDateLine(text: String): String? {
+        val lines = text.lines().map { it.trim() }
+        val i = lines.indexOfFirst { dateLineRe.containsMatchIn(it) }
+        if (i < 0) return null
+        return lines.drop(i + 1).take(3).firstOrNull { l ->
+            l.count { it.isLetter() } >= 3 && l.length <= 40 && !Regex("^[\\d\\s]+$").matches(l) &&
+                l.lowercase().split(Regex("[^a-z\u00e0-\u00ff]+")).none { it in footerWords }
+        }
+    }
+
     fun shop(text: String): String? {
+        belowDateLine(text)?.let { return it }
         val cands = text.lines().map { it.trim() }.filter { l ->
             val low = l.lowercase()
             l.count { it.isLetter() } >= 4 && l.length <= 40 && !l[0].isDigit() &&

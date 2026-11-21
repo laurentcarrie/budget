@@ -14,7 +14,9 @@ service). The only network calls are the sync, when you press **Synchro** and on
    **Enregistrer**. The photo is shown so the amount can be checked against the paper (the OCR sometimes confuses a bold
    `0` with an `8`).
 3. Tickets are stored in a local SQLite database. The photo stays in the app private storage.
-4. Tap a ticket to correct its date, shop or amount (the shop field proposes the known shops), to add a free
+4. Each ticket has a category (alimentation, pub, péage, ...): the field proposes the categories already used,
+   then a starter list (`Shops.DEFAULT_CATEGORIES`), and suggests the category you usually give to the shop you pick.
+   Tap a ticket to correct its date, shop, category or amount (the shop field proposes the known shops), to add a free
    description, or to delete it; a long press deletes it directly. The description is shown after the amount in the
    list and travels with the ticket when syncing.
 5. The main screen has two icons: the microphone (voice entry) and the camera (scan). The camera is off until the
@@ -81,7 +83,7 @@ With several devices connected, add `SERIAL=<serial>` (see `adb devices`).
 ## Sync through S3
 
 Each ticket is two objects under the configured prefix: `<uid>.jpg` (the photo) and `<uid>.json` (date, shop, amount,
-`description`, `deleted`, `updatedAt`). The `uid` is the photo file name, `ticket_<epochMs>_<4 hex of the install>`, so two devices
+`category`, `description`, `deleted`, `updatedAt`). The `uid` is the photo file name, `ticket_<epochMs>_<4 hex of the install>`, so two devices
 never collide. A **Synchro** (button, and once when the app opens) does:
 
 1. **push**: every ticket changed here (new, or deleted) is uploaded; a delete is a `.json` with `deleted: true`, so

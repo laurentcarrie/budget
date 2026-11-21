@@ -11,6 +11,9 @@
     <AutoCompleteTextView android:id="@+id/shop" android:hint="Magasin (toucher pour choisir)"
         android:inputType="textCapCharacters|textNoSuggestions" android:completionThreshold="1"
         android:layout_width="match_parent" android:layout_height="wrap_content" />
+    <AutoCompleteTextView android:id="@+id/category" android:hint="Cat\u00e9gorie (alimentation, pub, p\u00e9age...)"
+        android:inputType="textNoSuggestions" android:completionThreshold="1"
+        android:layout_width="match_parent" android:layout_height="wrap_content" />
     <EditText android:id="@+id/amount" android:hint="Montant (EUR)" android:inputType="numberDecimal"
         android:layout_width="match_parent" android:layout_height="wrap_content" />
     <EditText android:id="@+id/description" android:hint="Description (facultatif)"

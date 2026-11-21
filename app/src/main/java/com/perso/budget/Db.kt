@@ -14,15 +14,15 @@ import java.io.File
 data class Receipt(
     val id: Long, val uid: String, val date: String, val shop: String, val amount: Double, val photo: String,
     val uploaded: Boolean = false, val updatedAt: Long = 0, val deleted: Boolean = false, val etag: String? = null,
-    val description: String = ""
+    val description: String = "", val category: String = ""
 )
 
-class Db(ctx: Context) : SQLiteOpenHelper(ctx, "budget.db", null, 5) {
-    private val cols = "id,uid,date,shop,amount,photo,uploaded,updated_at,deleted,etag,description"
+class Db(ctx: Context) : SQLiteOpenHelper(ctx, "budget.db", null, 6) {
+    private val cols = "id,uid,date,shop,amount,photo,uploaded,updated_at,deleted,etag,description,category"
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE receipt(id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, shop TEXT, amount REAL, photo TEXT, " +
-            "uploaded INTEGER DEFAULT 0, uid TEXT, updated_at INTEGER DEFAULT 0, deleted INTEGER DEFAULT 0, etag TEXT, description TEXT DEFAULT '')")
+            "uploaded INTEGER DEFAULT 0, uid TEXT, updated_at INTEGER DEFAULT 0, deleted INTEGER DEFAULT 0, etag TEXT, description TEXT DEFAULT '', category TEXT DEFAULT '')")
         db.execSQL("CREATE UNIQUE INDEX receipt_uid ON receipt(uid)")
     }
 
@@ -47,11 +47,12 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "budget.db", null, 5) {
         if (o < 4) db.execSQL("ALTER TABLE receipt ADD COLUMN description TEXT DEFAULT ''")
         // Older builds kept the space a keyboard suggestion adds after a word: "alimentation " was another shop.
         // The cleaned tickets are pushed again, so the other devices (and the bucket) get the fix.
+        if (o < 6) db.execSQL("ALTER TABLE receipt ADD COLUMN category TEXT DEFAULT ''")
         if (o < 5) db.execSQL("UPDATE receipt SET shop=trim(shop), uploaded=0, updated_at=? WHERE shop != trim(shop)", arrayOf(System.currentTimeMillis()))
     }
 
     private fun read(c: Cursor) = Receipt(c.getLong(0), c.getString(1) ?: "", c.getString(2) ?: "", c.getString(3) ?: "",
-        c.getDouble(4), c.getString(5) ?: "", c.getInt(6) == 1, c.getLong(7), c.getInt(8) == 1, c.getString(9), c.getString(10) ?: "")
+        c.getDouble(4), c.getString(5) ?: "", c.getInt(6) == 1, c.getLong(7), c.getInt(8) == 1, c.getString(9), c.getString(10) ?: "", c.getString(11) ?: "")
 
     private fun query(where: String, order: String = "id"): List<Receipt> {
         val out = mutableListOf<Receipt>()
@@ -75,17 +76,36 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "budget.db", null, 5) {
         return Shops.distinct(perTicket)
     }
 
+    /** The categories to propose: the ones used on tickets (the most used first), then the default ones not used yet. */
+    fun categories(): List<String> {
+        val perTicket = mutableListOf<String>()
+        readableDatabase.rawQuery("SELECT category FROM receipt WHERE deleted=0 AND category != ''", null).use { while (it.moveToNext()) perTicket += it.getString(0) }
+        val used = Shops.distinct(perTicket)
+        return used + Shops.DEFAULT_CATEGORIES.filter { d -> used.none { Shops.key(it) == Shops.key(d) } }
+    }
+
+    /** The category most often given to the tickets of this shop (empty when there is none). */
+    fun usualCategory(shop: String): String {
+        val k = Shops.key(shop)
+        if (k.isEmpty()) return ""
+        val cats = mutableListOf<String>()
+        readableDatabase.rawQuery("SELECT shop, category FROM receipt WHERE deleted=0 AND category != ''", null).use {
+            while (it.moveToNext()) if (Shops.key(it.getString(0) ?: "") == k) cats += it.getString(1)
+        }
+        return Shops.distinct(cats).firstOrNull() ?: ""
+    }
+
     /** False when a ticket with this uid is already saved. */
-    fun insert(uid: String, date: String, shop: String, amount: Double, photo: String, description: String = ""): Boolean =
+    fun insert(uid: String, date: String, shop: String, amount: Double, photo: String, description: String = "", category: String = ""): Boolean =
         writableDatabase.insertWithOnConflict("receipt", null, ContentValues().apply {
-            put("uid", uid); put("date", date); put("shop", shop); put("amount", amount); put("photo", photo); put("description", description)
+            put("uid", uid); put("date", date); put("shop", shop); put("amount", amount); put("photo", photo); put("description", description); put("category", category)
             put("uploaded", 0); put("updated_at", System.currentTimeMillis()); put("deleted", 0)
         }, SQLiteDatabase.CONFLICT_IGNORE) != -1L
 
     /** A manual correction: marks the ticket as not in sync so the next sync pushes it. */
-    fun update(id: Long, date: String, shop: String, amount: Double, description: String) {
-        writableDatabase.execSQL("UPDATE receipt SET date=?, shop=?, amount=?, description=?, uploaded=0, updated_at=? WHERE id=?",
-            arrayOf(date, shop, amount, description, System.currentTimeMillis(), id))
+    fun update(id: Long, date: String, shop: String, amount: Double, description: String, category: String) {
+        writableDatabase.execSQL("UPDATE receipt SET date=?, shop=?, amount=?, description=?, category=?, uploaded=0, updated_at=? WHERE id=?",
+            arrayOf(date, shop, amount, description, category, System.currentTimeMillis(), id))
     }
 
     /** Hides the ticket and keeps a deleted row to tell the other devices. */
@@ -102,9 +122,9 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "budget.db", null, 5) {
     }
 
     /** Stores a ticket received from S3 (insert or update), already in sync. */
-    fun upsertRemote(uid: String, date: String, shop: String, amount: Double, photo: String, deleted: Boolean, updatedAt: Long, etag: String, description: String = "") {
+    fun upsertRemote(uid: String, date: String, shop: String, amount: Double, photo: String, deleted: Boolean, updatedAt: Long, etag: String, description: String = "", category: String = "") {
         val v = ContentValues().apply {
-            put("date", date); put("shop", shop); put("amount", amount); put("description", description); put("deleted", if (deleted) 1 else 0)
+            put("date", date); put("shop", shop); put("amount", amount); put("description", description); put("category", category); put("deleted", if (deleted) 1 else 0)
             put("updated_at", updatedAt); put("uploaded", 1); put("etag", etag)
             if (photo.isNotEmpty()) put("photo", photo)
         }
