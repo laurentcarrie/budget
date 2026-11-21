@@ -20,6 +20,10 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class MainActivity : AppCompatActivity() {
+    companion object {
+        private var autoSynced = false
+        private val syncing = java.util.concurrent.atomic.AtomicBoolean(false)
+    }
     private lateinit var db: Db
     private lateinit var list: ListView
     private lateinit var total: TextView
@@ -35,12 +39,12 @@ class MainActivity : AppCompatActivity() {
         total = findViewById(R.id.total)
         list.setOnItemLongClickListener { _, _, pos, _ ->
             AlertDialog.Builder(this).setMessage("Delete this entry?")
-                .setPositiveButton("Delete") { _, _ -> db.delete(items[pos].id); refresh() }
+                .setPositiveButton("Delete") { _, _ -> File(items[pos].photo).delete(); db.softDelete(items[pos].id); refresh() }
                 .setNegativeButton("Cancel", null).show()
             true
         }
         findViewById<Button>(R.id.capture).setOnClickListener { capture() }
-        findViewById<Button>(R.id.upload).setOnClickListener { upload() }
+        findViewById<Button>(R.id.upload).setOnClickListener { sync(false) }
         findViewById<Button>(R.id.settings).setOnClickListener { settings() }
         refresh()
         intent.getStringExtra("rescan")?.let { recognize(File(filesDir, File(it).name)) }
@@ -69,7 +73,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun capture() {
         val ic = imageCapture ?: return
-        val file = File(filesDir, "ticket_${System.currentTimeMillis()}.jpg")
+        val file = File(filesDir, "ticket_${System.currentTimeMillis()}_${deviceSuffix()}.jpg")
         ic.takePicture(ImageCapture.OutputFileOptions.Builder(file).build(),
             ContextCompat.getMainExecutor(this), object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(o: ImageCapture.OutputFileResults) { recognize(file) }
@@ -137,7 +141,8 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Save") { _, _ ->
                 val a = v.findViewById<EditText>(R.id.amount).text.toString().replace(',', '.').toDoubleOrNull() ?: 0.0
                 val s = v.findViewById<EditText>(R.id.shop).text.toString().ifBlank { "Unknown" }
-                db.insert(v.findViewById<EditText>(R.id.date).text.toString().trim(), s, a, file.absolutePath)
+                if (!db.insert(file.nameWithoutExtension, v.findViewById<EditText>(R.id.date).text.toString().trim(), s, a, file.absolutePath))
+                    toast("This ticket is already saved")
                 refresh()
             }
             .setNegativeButton("Discard") { _, _ -> file.delete() }
@@ -154,6 +159,13 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         importKeyFile()
+        if (!autoSynced && S3.Config(this).configured) { autoSynced = true; sync(true) }
+    }
+
+    /** Random, kept for the life of the install: makes ticket names unique across devices. */
+    private fun deviceSuffix(): String {
+        val p = getSharedPreferences("app", MODE_PRIVATE)
+        return p.getString("device", null) ?: java.util.UUID.randomUUID().toString().take(4).also { p.edit().putString("device", it).apply() }
     }
 
     /** `make push-key` drops aws-key.properties in the app's external files dir over USB; read it once, then delete it. */
@@ -185,28 +197,23 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Cancel", null).show()
     }
 
-    private fun upload() {
+    private fun sync(auto: Boolean) {
         val cfg = S3.Config(this)
-        if (!cfg.configured) { toast("Enter the AWS key first"); settings(); return }
-        val pending = items.filter { !it.uploaded }
-        if (pending.isEmpty()) { toast("Nothing to upload"); return }
-        toast("Uploading ${pending.size} ticket(s)...")
+        if (!cfg.configured) { if (!auto) { toast("Enter the AWS key first"); settings() }; return }
+        if (!syncing.compareAndSet(false, true)) return
+        if (!auto) toast("Syncing...")
         Thread {
-            var ok = 0; var error: String? = null
-            for (r in pending) {
-                try {
-                    val photo = File(r.photo)
-                    val base = photo.nameWithoutExtension
-                    if (photo.exists()) S3.put(cfg, "$base.jpg", photo.readBytes(), "image/jpeg")
-                    val json = org.json.JSONObject().put("date", r.date).put("shop", r.shop).put("amount", r.amount)
-                        .put("currency", "EUR").put("photo", if (photo.exists()) "$base.jpg" else org.json.JSONObject.NULL).toString(2)
-                    S3.put(cfg, "$base.json", json.toByteArray(), "application/json")
-                    db.markUploaded(r.id); ok++
-                } catch (e: Exception) { error = e.message; Log.w("Budget", "upload failed", e); break }
-            }
+            var result: Sync.Result? = null; var error: String? = null
+            try { result = Sync.run(cfg, db, filesDir) }
+            catch (e: Exception) { error = e.message ?: e.toString(); Log.w("Budget", "sync failed", e) }
+            finally { syncing.set(false) }
             runOnUiThread {
                 refresh()
-                toast(if (error == null) "Uploaded $ok ticket(s)" else "Uploaded $ok, failed: $error")
+                when {
+                    error != null -> if (!auto) toast("Sync failed: $error")
+                    result!!.changed -> toast("Sync: $result")
+                    !auto -> toast("Already in sync")
+                }
             }
         }.start()
     }

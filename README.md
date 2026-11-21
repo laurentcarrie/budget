@@ -1,10 +1,10 @@
 # laurent-budget
 
 Android app that scans a card payment receipt with the camera, finds the **amount**, the **shop** and the **date**,
-stores the ticket locally, and can upload the photo and the data to an S3 bucket.
+stores the ticket locally, and keeps several devices (phone, tablet) in sync through an S3 bucket.
 
 Everything runs on the device: the text recognition is Google ML Kit with a bundled model (no network, no AI
-service). The only network call is the upload, when you press **Upload**.
+service). The only network calls are the sync, when you press **Sync** and once when the app opens.
 
 ## How it works
 
@@ -14,8 +14,8 @@ service). The only network call is the upload, when you press **Upload**.
    **Save**. The photo is shown so the amount can be checked against the paper (the OCR sometimes confuses a bold
    `0` with an `8`).
 3. Tickets are stored in a local SQLite database. The photo stays in the app private storage.
-4. **Upload** sends every ticket without a ✓ (photo `ticket_<id>.jpg` and data `ticket_<id>.json`) to the bucket,
-   under the configured prefix, then marks it ✓. Long-press a ticket to delete it from the list.
+4. **Sync** pushes what changed on this device and pulls what the other devices pushed (see below). A ✓ means the
+   ticket is in sync. Long-press a ticket to delete it; the delete reaches the other devices at their next sync.
 
 The parser (`Parser.kt`) is plain Kotlin:
 
@@ -23,8 +23,8 @@ The parser (`Parser.kt`) is plain Kotlin:
   ignored. A single decimal (`14.8`) is read as `14.80`.
 - **Shop**: a previously saved shop that matches a line of the ticket (tolerating about 20% of OCR typos, and cheap
   swaps such as I/T, 0/O, 8/B, 5/S, M/H); otherwise the first plausible line in capitals.
-- **Date**: `dd/mm/yyyy` with an optional time. Dates in the future are rejected; when the OCR drops a digit of the
-  month (`19/1/2026`), the candidate closest to today wins.
+- **Date**: `dd/mm/yyyy` or French month names (`12 novembre 2026`, `3 janv. 2026`), with an optional time. Dates in
+  the future are rejected; when the OCR drops a digit of the month (`19/1/2026`), the candidate closest to today wins.
 
 ## Requirements
 
@@ -44,6 +44,7 @@ The parser (`Parser.kt`) is plain Kotlin:
 | `make release` | signed release apk, `laurent-budget-release.apk` (needs `keystore.properties`) |
 | `make deploy` | build and install on the connected device, grant the camera permission |
 | `make run` | deploy and launch |
+| `make test` | unit tests (parser, SigV4 signing, sync decisions) |
 | `make push-key` | send the AWS key to the device over USB (see below) |
 | `make gdrive` | upload the apk to `gdrive:apk/budget/laurent-budget.apk` |
 | `make log` | show the OCR text logged by the app |
@@ -61,19 +62,32 @@ With several devices connected, add `SERIAL=<serial>` (see `adb devices`).
 | `keystore.properties` | release signing: `storeFile`, `storePassword`, `keyAlias`, `keyPassword` |
 | `budget-release.jks` | the release keystore |
 
-## Upload to S3
+## Sync through S3
 
-The app uses a plain SigV4 signed `PUT` (no AWS SDK). Use a dedicated IAM user that can only write under the
-prefix: `iam-policy.json` is the policy (`s3:PutObject` on `<prefix>/*`, nothing else).
+Each ticket is two objects under the configured prefix: `<uid>.jpg` (the photo) and `<uid>.json` (date, shop, amount,
+`deleted`, `updatedAt`). The `uid` is the photo file name, `ticket_<epochMs>_<4 hex of the install>`, so two devices
+never collide. A **Sync** (button, and once when the app opens) does:
+
+1. **push**: every ticket changed here (new, or deleted) is uploaded; a delete is a `.json` with `deleted: true`, so
+   no S3 delete permission is needed
+2. **pull**: list the prefix, download the `.json` files that are unknown here or whose ETag changed, and the photos of
+   new tickets; the most recent `updatedAt` wins
+
+The app talks to S3 with plain SigV4 signed requests (`PUT`, `GET`, list; no AWS SDK). Use a dedicated IAM user:
+`iam-policy.json` allows `s3:PutObject` and `s3:GetObject` on `<prefix>/*` and `s3:ListBucket` on the bucket for the
+prefix only. It cannot delete anything and cannot touch anything outside the prefix.
 
 ```
 aws iam create-user --user-name budget-uploader
-aws iam put-user-policy --user-name budget-uploader --policy-name budget-put-only --policy-document file://iam-policy.json
+aws iam put-user-policy --user-name budget-uploader --policy-name budget-sync --policy-document file://iam-policy.json
 aws iam create-access-key --user-name budget-uploader
 ```
 
 Put the returned `AccessKeyId` and `SecretAccessKey` in `aws.properties` (`key_id` is 20 characters, `secret` is 40).
-Set `region`, `bucket` and `prefix` there too.
+Set `region`, `bucket` and `prefix` there too. Because the key can read the tickets, treat a lost device like a lost
+key: revoke it with `aws iam delete-access-key`.
+
+A new device (or a reinstall) gets everything back with its first sync.
 
 ### The key is not in the apk
 
@@ -95,7 +109,8 @@ apk. **Back up `budget-release.jks` and `keystore.properties`**: without them an
 updated, only uninstalled (which erases its local tickets). A copy is kept in `gdrive:apk/budget/`.
 
 A device that has the debug-signed app must be uninstalled (`adb uninstall com.perso.budget`) before the release
-apk can be installed, because the signatures differ.
+apk can be installed, because the signatures differ. Sync the tickets first (✓ on every ticket): the first sync after
+the reinstall brings them all back.
 
 ## Debugging
 
