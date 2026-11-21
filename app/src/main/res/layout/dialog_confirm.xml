@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:padding="16dp">
+    <ImageView android:id="@+id/photo" android:layout_width="match_parent" android:layout_height="260dp"
+        android:scaleType="fitCenter" android:adjustViewBounds="true" />
+    <EditText android:id="@+id/date" android:hint="Date (yyyy-MM-dd HH:mm)" android:inputType="text"
+        android:layout_width="match_parent" android:layout_height="wrap_content" />
+    <EditText android:id="@+id/shop" android:hint="Shop" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    <EditText android:id="@+id/amount" android:hint="Amount (EUR)" android:inputType="numberDecimal"
+        android:layout_width="match_parent" android:layout_height="wrap_content" />
+</LinearLayout>

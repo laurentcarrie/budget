@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:padding="16dp">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="AWS access key used to upload tickets" />
+    <EditText android:id="@+id/key_id" android:hint="Access key ID (20 characters, AKIA...)"
+        android:inputType="textNoSuggestions" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    <EditText android:id="@+id/secret" android:hint="Secret access key (40 characters)"
+        android:inputType="textPassword" android:layout_width="match_parent" android:layout_height="wrap_content" />
+</LinearLayout>

@@ -1,0 +1,6 @@
+# copy to aws.properties (git-ignored) and fill in
+key_id=AKIA...
+secret=...
+region=eu-west-3
+bucket=zik-laurent
+prefix=budget
