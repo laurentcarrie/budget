@@ -31,4 +31,13 @@ class ShopsTest {
     }
 
     @Test fun aNewShopIsOnlyTrimmed() = assertEquals("Chez Paul", Shops.canonical("  Chez Paul ", listOf("pub")))
+
+    @Test fun theStarterCategoriesHaveIconsAndTypingTheWordGivesTheIcon() {
+        val d = Shops.DEFAULT_CATEGORIES
+        assertEquals(d.size, d.map { Shops.key(it) }.toSet().size) // no two starters are the same category
+        assertEquals("pub \uD83C\uDF7B", d.first { Shops.key(it) == "pub" })
+        assertEquals("pub \uD83C\uDF7B", Shops.canonical("pub", d))
+        assertEquals("p\u00e9age \uD83D\uDEE3\uFE0F", Shops.canonical("Peage", d))
+        assertEquals("alimentation \uD83D\uDED2", Shops.canonical("Alimentation ", d))
+    }
 }

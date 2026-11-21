@@ -7,9 +7,10 @@ import java.text.Normalizer
  * are the same shop. [distinct] gives one spelling per shop for the dropdown, [canonical] gives the spelling to save.
  */
 object Shops {
-    /** The categories offered before any ticket has one; the ones already used come first. */
-    val DEFAULT_CATEGORIES = listOf("alimentation", "restaurant", "pub", "p\u00e9age", "essence", "transport", "sant\u00e9",
-        "loisirs", "v\u00eatements", "maison", "cadeaux", "divers")
+    /** The categories offered before any ticket has one (the ones already used come first). The icon is part of the name. */
+    val DEFAULT_CATEGORIES = listOf("alimentation \uD83D\uDED2", "restaurant \uD83C\uDF7D\uFE0F", "pub \uD83C\uDF7B", "p\u00e9age \uD83D\uDEE3\uFE0F",
+        "essence \u26FD", "transport \uD83D\uDE86", "sant\u00e9 \uD83D\uDC8A", "loisirs \uD83C\uDFAD", "v\u00eatements \uD83D\uDC55",
+        "maison \uD83C\uDFE0", "cadeaux \uD83C\uDF81", "divers \uD83D\uDCE6")
 
     /** What makes two names the same shop: letters and digits only, without case or accents. */
     fun key(s: String): String =
