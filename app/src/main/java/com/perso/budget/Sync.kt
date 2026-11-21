@@ -35,7 +35,7 @@ object Sync {
     /** Tolerates the first JSON files, which had no uid, deleted or updatedAt. */
     fun parse(uid: String, json: String): RemoteTicket {
         val o = JSONObject(json)
-        return RemoteTicket(uid, o.optString("date"), o.optString("shop"), o.optDouble("amount", 0.0),
+        return RemoteTicket(uid, o.optString("date"), o.optString("shop").trim(), o.optDouble("amount", 0.0),
             o.optBoolean("deleted", false), o.optLong("updatedAt", 0), o.has("photo") && !o.isNull("photo"), o.optString("description"))
     }
 

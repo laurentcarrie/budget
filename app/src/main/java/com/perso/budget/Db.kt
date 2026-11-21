@@ -17,7 +17,7 @@ data class Receipt(
     val description: String = ""
 )
 
-class Db(ctx: Context) : SQLiteOpenHelper(ctx, "budget.db", null, 4) {
+class Db(ctx: Context) : SQLiteOpenHelper(ctx, "budget.db", null, 5) {
     private val cols = "id,uid,date,shop,amount,photo,uploaded,updated_at,deleted,etag,description"
 
     override fun onCreate(db: SQLiteDatabase) {
@@ -45,6 +45,9 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "budget.db", null, 4) {
             db.execSQL("CREATE UNIQUE INDEX receipt_uid ON receipt(uid)")
         }
         if (o < 4) db.execSQL("ALTER TABLE receipt ADD COLUMN description TEXT DEFAULT ''")
+        // Older builds kept the space a keyboard suggestion adds after a word: "alimentation " was another shop.
+        // The cleaned tickets are pushed again, so the other devices (and the bucket) get the fix.
+        if (o < 5) db.execSQL("UPDATE receipt SET shop=trim(shop), uploaded=0, updated_at=? WHERE shop != trim(shop)", arrayOf(System.currentTimeMillis()))
     }
 
     private fun read(c: Cursor) = Receipt(c.getLong(0), c.getString(1) ?: "", c.getString(2) ?: "", c.getString(3) ?: "",
@@ -65,11 +68,11 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "budget.db", null, 4) {
     /** Rows whose latest state is not in S3 yet. */
     fun pending(): List<Receipt> = query("uploaded=0")
 
-    /** The shops of the saved tickets, the most used first. */
+    /** The shops of the saved tickets, one spelling per shop, the most used first (see [Shops]). */
     fun shops(): List<String> {
-        val out = mutableListOf<String>()
-        readableDatabase.rawQuery("SELECT shop FROM receipt WHERE deleted=0 GROUP BY shop ORDER BY COUNT(*) DESC, shop", null).use { while (it.moveToNext()) out += it.getString(0) }
-        return out
+        val perTicket = mutableListOf<String>()
+        readableDatabase.rawQuery("SELECT shop FROM receipt WHERE deleted=0", null).use { while (it.moveToNext()) perTicket += it.getString(0) ?: "" }
+        return Shops.distinct(perTicket)
     }
 
     /** False when a ticket with this uid is already saved. */

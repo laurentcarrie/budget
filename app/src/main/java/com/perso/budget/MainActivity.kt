@@ -193,7 +193,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun fields(v: android.view.View, fallbackDate: String) = Fields(
         v.findViewById<EditText>(R.id.date).text.toString().trim().ifBlank { fallbackDate },
-        v.findViewById<AutoCompleteTextView>(R.id.shop).text.toString().trim().ifBlank { "Unknown" },
+        Shops.canonical(v.findViewById<AutoCompleteTextView>(R.id.shop).text.toString(), db.shops()).ifBlank { "Unknown" },
         v.findViewById<EditText>(R.id.amount).text.toString().replace(',', '.').toDoubleOrNull() ?: 0.0,
         v.findViewById<EditText>(R.id.description).text.toString().trim())
 
