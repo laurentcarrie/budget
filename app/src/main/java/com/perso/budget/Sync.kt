@@ -5,7 +5,7 @@ import java.io.File
 
 /** A ticket as described by its <uid>.json object in S3. */
 data class RemoteTicket(val uid: String, val date: String, val shop: String, val amount: Double, val deleted: Boolean, val updatedAt: Long,
-                        val hasPhoto: Boolean = true)
+                        val hasPhoto: Boolean = true, val description: String = "")
 
 /**
  * Two-way sync of the tickets through the S3 prefix: push what changed here, then pull what the other devices
@@ -36,12 +36,12 @@ object Sync {
     fun parse(uid: String, json: String): RemoteTicket {
         val o = JSONObject(json)
         return RemoteTicket(uid, o.optString("date"), o.optString("shop"), o.optDouble("amount", 0.0),
-            o.optBoolean("deleted", false), o.optLong("updatedAt", 0), o.has("photo") && !o.isNull("photo"))
+            o.optBoolean("deleted", false), o.optLong("updatedAt", 0), o.has("photo") && !o.isNull("photo"), o.optString("description"))
     }
 
     fun toJson(r: Receipt): String = JSONObject().put("uid", r.uid).put("date", r.date).put("shop", r.shop)
         .put("amount", r.amount).put("currency", "EUR").put("photo", if (r.photo.isEmpty()) JSONObject.NULL else "${r.uid}.jpg")
-        .put("deleted", r.deleted).put("updatedAt", r.updatedAt).toString(2)
+        .put("deleted", r.deleted).put("updatedAt", r.updatedAt).put("description", r.description).toString(2)
 
     /** Runs a full sync; throws on the first network or S3 error (what was done before stays done). */
     fun run(cfg: S3.Config, db: Db, dir: File): Result {
@@ -64,12 +64,12 @@ object Sync {
                     val photo = File(dir, "$uid.jpg")
                     val path = if (!t.hasPhoto) "" else try { photo.writeBytes(S3.get(cfg, "$uid.jpg")); photo.absolutePath }
                     catch (e: java.io.IOException) { if (e.message?.startsWith("S3 404") == true) "" else throw e }
-                    db.upsertRemote(uid, t.date, t.shop, t.amount, path, false, t.updatedAt, etag); received++
+                    db.upsertRemote(uid, t.date, t.shop, t.amount, path, false, t.updatedAt, etag, t.description); received++
                 }
-                Action.TOMBSTONE -> db.upsertRemote(uid, t.date, t.shop, t.amount, "", true, t.updatedAt, etag)
-                Action.APPLY_UPDATE -> { db.upsertRemote(uid, t.date, t.shop, t.amount, "", false, t.updatedAt, etag); received++ }
+                Action.TOMBSTONE -> db.upsertRemote(uid, t.date, t.shop, t.amount, "", true, t.updatedAt, etag, t.description)
+                Action.APPLY_UPDATE -> { db.upsertRemote(uid, t.date, t.shop, t.amount, "", false, t.updatedAt, etag, t.description); received++ }
                 Action.APPLY_DELETE -> {
-                    db.upsertRemote(uid, t.date, t.shop, t.amount, "", true, t.updatedAt, etag)
+                    db.upsertRemote(uid, t.date, t.shop, t.amount, "", true, t.updatedAt, etag, t.description)
                     mine?.photo?.takeIf { it.isNotEmpty() }?.let { File(it).delete() }
                     deleted++
                 }

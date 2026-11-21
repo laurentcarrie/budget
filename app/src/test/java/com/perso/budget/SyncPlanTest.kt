@@ -43,4 +43,22 @@ class SyncPlanTest {
         val r = local("ticket_9_ab12", updatedAt = 1234, deleted = true)
         assertEquals(remote("ticket_9_ab12", 1234, true), Sync.parse(r.uid, Sync.toJson(r)))
     }
+
+    @Test fun descriptionTravelsInTheJson() {
+        val r = local("ticket_9_ab12", updatedAt = 1234).copy(description = "Anniversaire de L\u00e9a, \"cadeau\"")
+        val t = Sync.parse(r.uid, Sync.toJson(r))
+        assertEquals(r.description, t.description)
+        assertEquals(RemoteTicket("ticket_9_ab12", "2026-11-19 18:52", "THE FROG", 7.0, false, 1234, true, r.description), t)
+    }
+
+    @Test fun jsonWithoutDescriptionGivesAnEmptyOne() {
+        val t = Sync.parse("a", """{"date":"2026-11-20 23:52","shop":"CARBONE 14","amount":14,"deleted":false,"updatedAt":5}""")
+        assertEquals("", t.description)
+    }
+
+    @Test fun aNewerRemoteDescriptionIsApplied() {
+        val mine = local("a", updatedAt = 100)
+        val theirs = remote("a", 200).copy(description = "avec Paul")
+        assertEquals(Sync.Action.APPLY_UPDATE, Sync.decide(mine, theirs))
+    }
 }
