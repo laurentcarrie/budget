@@ -63,9 +63,10 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "budget.db", null, 3) {
     /** Rows whose latest state is not in S3 yet. */
     fun pending(): List<Receipt> = query("uploaded=0")
 
+    /** The shops of the saved tickets, the most used first. */
     fun shops(): List<String> {
         val out = mutableListOf<String>()
-        readableDatabase.rawQuery("SELECT DISTINCT shop FROM receipt WHERE deleted=0", null).use { while (it.moveToNext()) out += it.getString(0) }
+        readableDatabase.rawQuery("SELECT shop FROM receipt WHERE deleted=0 GROUP BY shop ORDER BY COUNT(*) DESC, shop", null).use { while (it.moveToNext()) out += it.getString(0) }
         return out
     }
 

@@ -135,12 +135,17 @@ class MainActivity : AppCompatActivity() {
         v.findViewById<android.widget.ImageView>(R.id.photo).setImageBitmap(
             android.graphics.BitmapFactory.decodeFile(file.absolutePath, android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }))
         v.findViewById<EditText>(R.id.date).setText(date ?: SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date()))
-        v.findViewById<EditText>(R.id.shop).setText(shop)
+        val shopField = v.findViewById<AutoCompleteTextView>(R.id.shop)
+        shopField.setAdapter(ShopAdapter(this, db.shops().filter { it.isNotBlank() && it != "Unknown" }, shop))
+        shopField.setText(shop)
+        // Show every known shop as soon as the field is tapped, not only after typing.
+        shopField.setOnClickListener { shopField.showDropDown() }
+        shopField.setOnFocusChangeListener { _, focused -> if (focused) shopField.showDropDown() }
         v.findViewById<EditText>(R.id.amount).setText(amount?.let { "%.2f".format(Locale.US, it) } ?: "")
         AlertDialog.Builder(this).setTitle("Check and save").setView(v)
             .setPositiveButton("Save") { _, _ ->
                 val a = v.findViewById<EditText>(R.id.amount).text.toString().replace(',', '.').toDoubleOrNull() ?: 0.0
-                val s = v.findViewById<EditText>(R.id.shop).text.toString().ifBlank { "Unknown" }
+                val s = v.findViewById<AutoCompleteTextView>(R.id.shop).text.toString().trim().ifBlank { "Unknown" }
                 if (!db.insert(file.nameWithoutExtension, v.findViewById<EditText>(R.id.date).text.toString().trim(), s, a, file.absolutePath))
                     toast("This ticket is already saved")
                 refresh()
@@ -219,4 +224,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_SHORT).show()
+}
+
+/**
+ * The dropdown of known shops, most used first. It lists every shop while the field still holds the guessed
+ * name (or is empty), and narrows to the shops containing what the user types afterwards.
+ */
+class ShopAdapter(ctx: android.content.Context, private val all: List<String>, private val guessed: String) :
+    ArrayAdapter<String>(ctx, android.R.layout.simple_dropdown_item_1line, all.toMutableList()) {
+    override fun getFilter(): Filter = object : Filter() {
+        override fun performFiltering(c: CharSequence?): FilterResults {
+            val q = c?.toString().orEmpty().trim().lowercase()
+            val out = if (q.isEmpty() || q == guessed.trim().lowercase()) all else all.filter { it.lowercase().contains(q) }
+            return FilterResults().apply { values = out; count = out.size }
+        }
+        @Suppress("UNCHECKED_CAST")
+        override fun publishResults(c: CharSequence?, r: FilterResults) {
+            clear(); addAll(r.values as List<String>); notifyDataSetChanged()
+        }
+    }
 }

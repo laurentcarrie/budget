@@ -6,7 +6,9 @@
         android:scaleType="fitCenter" android:adjustViewBounds="true" />
     <EditText android:id="@+id/date" android:hint="Date (yyyy-MM-dd HH:mm)" android:inputType="text"
         android:layout_width="match_parent" android:layout_height="wrap_content" />
-    <EditText android:id="@+id/shop" android:hint="Shop" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    <AutoCompleteTextView android:id="@+id/shop" android:hint="Shop (tap to choose a known shop)"
+        android:inputType="textCapCharacters|textNoSuggestions" android:completionThreshold="1"
+        android:layout_width="match_parent" android:layout_height="wrap_content" />
     <EditText android:id="@+id/amount" android:hint="Amount (EUR)" android:inputType="numberDecimal"
         android:layout_width="match_parent" android:layout_height="wrap_content" />
 </LinearLayout>
