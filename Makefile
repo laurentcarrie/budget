@@ -12,10 +12,13 @@ PKG := com.perso.budget
 ADB := adb $(if $(SERIAL),-s $(SERIAL))
 
 .DEFAULT_GOAL := help
-.PHONY: help build release deploy run push-key log gdrive clean
+.PHONY: help test build release deploy run push-key log gdrive clean
 
 help: ## show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
+
+test: ## run the unit tests (parser: amount, shop, date)
+	./gradlew testDebugUnitTest -q
 
 build: ## build the debug apk
 	./gradlew assembleDebug -q

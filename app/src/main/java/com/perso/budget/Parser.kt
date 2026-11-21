@@ -75,9 +75,15 @@ object Parser {
     }
 
     private val dateRe = Regex("""([0-9OIl]{1,2})\s?[/.\-]\s?([0-9OIl]{1,2})\s?[/.\-]\s?((?:20)?[0-9OIl]{2})(.{0,25})""")
+    // "12 novembre 2026", "3 janv. 2026": the month is matched on its first letters, accents removed.
+    private val months = listOf("jan", "fev", "mar", "avr", "mai", "juin", "juil", "aou", "sep", "oct", "nov", "dec")
+    private val dateWordsRe = Regex("""\b([0-3]?\d)\s+(juin|juil|jan|fev|mar|avr|mai|aou|sep|oct|nov|dec)[a-z]*\.?\s+((?:20)?\d{2})\b(.{0,25})""")
     private val timeRe = Regex("""\b([0-2]?\d)\s?[:.h]\s?([0-5]\d)""")
 
     private fun digits(s: String) = s.replace('O', '0').replace('o', '0').replace('I', '1').replace('l', '1').toIntOrNull()
+
+    private fun unaccent(s: String) =
+        java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
 
     /**
      * The ticket date as "yyyy-MM-dd" or "yyyy-MM-dd HH:mm". Dates in the future are rejected, and when the
@@ -85,17 +91,25 @@ object Parser {
      */
     fun date(text: String, today: java.time.LocalDate = java.time.LocalDate.now()): String? {
         val found = mutableListOf<Pair<java.time.LocalDate, String?>>()
-        for (m in dateRe.findAll(text)) {
-            val d = digits(m.groupValues[1]) ?: continue
-            val mo = digits(m.groupValues[2]) ?: continue
-            var y = digits(m.groupValues[3]) ?: continue
-            if (y < 100) y += 2000
-            val months = if (mo == 1) listOf(1, 10, 11, 12) else listOf(mo)
-            val t = timeRe.find(m.groupValues[4])?.let { "%02d:%s".format(it.groupValues[1].toInt(), it.groupValues[2]) }
+        fun add(d: Int, months: List<Int>, year: Int, tail: String) {
+            val y = if (year < 100) year + 2000 else year
+            val t = timeRe.find(tail)?.let { "%02d:%s".format(it.groupValues[1].toInt(), it.groupValues[2]) }
             for (month in months) {
                 val dt = try { java.time.LocalDate.of(y, month, d) } catch (e: Exception) { continue }
                 if (!dt.isAfter(today) && y in 2000..2100) found += dt to t
             }
+        }
+        for (m in dateRe.findAll(text)) {
+            val d = digits(m.groupValues[1]) ?: continue
+            val mo = digits(m.groupValues[2]) ?: continue
+            val y = digits(m.groupValues[3]) ?: continue
+            add(d, if (mo == 1) listOf(1, 10, 11, 12) else listOf(mo), y, m.groupValues[4])
+        }
+        for (m in dateWordsRe.findAll(unaccent(text).lowercase())) {
+            val d = m.groupValues[1].toInt()
+            val mo = months.indexOf(m.groupValues[2]) + 1
+            val y = m.groupValues[3].toIntOrNull() ?: continue
+            if (mo > 0) add(d, listOf(mo), y, m.groupValues[4])
         }
         val best = found.groupingBy { it }.eachCount().entries
             .maxWithOrNull(compareBy<Map.Entry<Pair<java.time.LocalDate, String?>, Int>> { it.key.first }.thenBy { it.value })
