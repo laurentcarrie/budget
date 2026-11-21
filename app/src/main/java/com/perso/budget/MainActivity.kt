@@ -3,8 +3,11 @@ package com.perso.budget
 import android.Manifest
 import android.content.pm.PackageManager
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
+import android.speech.RecognitionSupport
+import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
@@ -264,56 +267,99 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ---- Voice entry, in French, in two steps: the amount, then the shop ----
+    // One recognizer lives for the whole session: the Google speech service drops the connection when recognizers
+    // are created and destroyed in quick succession.
     private var speech: SpeechRecognizer? = null
     private var listening: AlertDialog? = null
     private var spokenAmount: Double? = null
     private var heard = ""
+    private var useOffline = true
 
     private fun speak() {
         if (!SpeechRecognizer.isRecognitionAvailable(this)) { toast("No speech recognition on this device"); return }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 2); return
         }
+        endSession()
         spokenAmount = null; heard = ""
-        listen(true)
+        speech = SpeechRecognizer.createSpeechRecognizer(this)
+        chooseEngine { offline -> useOffline = offline; listen(true, offline) }
     }
 
-    private fun listen(amountStep: Boolean) {
-        val r = SpeechRecognizer.createSpeechRecognizer(this)
-        speech = r
-        listening = AlertDialog.Builder(this).setTitle(if (amountStep) "Amount" else "Shop")
-            .setMessage(if (amountStep) "Say the amount in French, for example: \u00ab quatorze euros quatre-vingts \u00bb"
-                        else "Say the shop in French, for example: \u00ab chez Carbone \u00bb")
-            .setNegativeButton("Cancel") { _, _ -> stopListening() }.setCancelable(false).show()
+    private fun frenchIntent(offline: Boolean) = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+        .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR")
+        .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, offline)
+        .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+        .putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
+
+    /** Offline when the French pack is installed on the device (Android 13+ can tell), otherwise online. */
+    private fun chooseEngine(go: (Boolean) -> Unit) {
+        val r = speech ?: return
+        if (Build.VERSION.SDK_INT < 33) { go(true); return }
+        var answered = false // the service can call back twice
+        r.checkRecognitionSupport(frenchIntent(true), mainExecutor, object : RecognitionSupportCallback {
+            override fun onSupportResult(support: RecognitionSupport) {
+                if (answered) return
+                answered = true
+                Log.d("Budget", "speech offline languages: installed=${support.installedOnDeviceLanguages}")
+                go(support.installedOnDeviceLanguages.any { it.startsWith("fr") })
+            }
+            override fun onError(error: Int) {
+                if (answered) return
+                answered = true
+                Log.w("Budget", "speech support check error $error, trying offline first")
+                go(true) // if the offline model does not work, listen() falls back to online
+            }
+        })
+    }
+
+    private fun listen(amountStep: Boolean, offline: Boolean) {
+        val r = speech ?: return
+        val example = if (amountStep) "Say the amount in French, for example: \u00ab quatorze euros quatre-vingts \u00bb"
+                      else "Say the shop in French, for example: \u00ab chez Carbone \u00bb"
+        listening?.dismiss()
+        listening = AlertDialog.Builder(this).setTitle(if (amountStep) "Amount" else "Shop").setMessage("Starting...\n\n$example")
+            .setNegativeButton("Cancel") { _, _ -> endSession() }.setCancelable(false).show()
+        fun status(s: String) = runOnUiThread { listening?.setMessage("$s\n\n$example") }
         r.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) = status("Speak now")
+            override fun onBeginningOfSpeech() = status("Hearing you...")
+            override fun onEndOfSpeech() = status("Processing...")
             override fun onResults(results: Bundle?) {
                 val words = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
-                stopListening(); heard(amountStep, words)
+                Log.d("Budget", "speech heard (offline=$offline): $words")
+                listening?.dismiss(); listening = null
+                heard(amountStep, words)
             }
-            override fun onError(error: Int) { stopListening(); toast(speechError(error)) }
-            override fun onReadyForSpeech(params: Bundle?) {}
-            override fun onBeginningOfSpeech() {}
+            override fun onError(error: Int) {
+                Log.w("Budget", "speech error $error (offline=$offline)")
+                listening?.dismiss(); listening = null
+                // No French offline pack (12, 13) or the offline model understood nothing (7): once, try online
+                if (offline && (error == 12 || error == 13 || error == 7)) {
+                    useOffline = false
+                    toast("Offline French did not work, trying online: speak again")
+                    r.cancel(); listen(amountStep, false)
+                } else { endSession(); toast("${speechError(error)} ($error)") }
+            }
             override fun onRmsChanged(rmsdB: Float) {}
             override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() {}
             override fun onPartialResults(partialResults: Bundle?) {}
             override fun onEvent(eventType: Int, params: Bundle?) {}
         })
-        r.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR")
-            .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true) // the French offline pack when installed, else online
-            .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-            .putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName))
+        r.startListening(frenchIntent(offline))
     }
 
-    private fun stopListening() {
+    private fun endSession() {
         listening?.dismiss(); listening = null
         speech?.destroy(); speech = null
     }
 
     private fun speechError(code: Int) = when (code) {
-        SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Nothing understood, try again"
+        SpeechRecognizer.ERROR_NO_MATCH -> "Not understood, try again"
+        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech heard, try again closer to the microphone"
+        SpeechRecognizer.ERROR_AUDIO -> "The microphone could not be read"
+        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "The speech service is busy, try again"
         SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT, SpeechRecognizer.ERROR_SERVER ->
             "No network and no offline French pack: install it in the Google speech settings"
         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "The microphone permission is required"
@@ -321,14 +367,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun heard(amountStep: Boolean, words: List<String>) {
-        if (words.isEmpty()) { toast("Nothing understood, try again"); return }
+        if (words.isEmpty()) { endSession(); toast("Nothing understood, try again"); return }
         if (amountStep) {
             spokenAmount = words.firstNotNullOfOrNull { Spoken.amount(it) }
             heard = "\u00ab ${words.first()} \u00bb"
             if (spokenAmount == null) toast("Amount not understood, you can type it")
-            listen(false)
+            speech?.cancel(); listen(false, useOffline)
         } else {
             heard += "  \u00ab ${words.first()} \u00bb"
+            endSession()
             confirmSpoken(Spoken.shop(words, db.shops()) ?: "", spokenAmount)
         }
     }
@@ -345,7 +392,7 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Cancel", null).setCancelable(false).show()
     }
 
-    override fun onDestroy() { stopListening(); super.onDestroy() }
+    override fun onDestroy() { endSession(); super.onDestroy() }
 
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_SHORT).show()
 }
