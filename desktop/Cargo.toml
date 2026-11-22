@@ -1,0 +1,18 @@
+[package]
+name = "budget"
+version = "0.1.0"
+edition = "2021"
+description = "Desktop client of the laurent-budget S3 store: read, search, add, edit, delete tickets"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+hmac = "0.12"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+ureq = "2"
+regex = "1"
+unicode-normalization = "0.1"
+ratatui = "0.29"
+unicode-width = "0.2"

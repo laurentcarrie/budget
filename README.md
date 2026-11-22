@@ -139,3 +139,34 @@ the reinstall brings them all back.
 - Re-run the OCR on a photo already stored on the device, without the camera:
   `adb shell am start -n com.perso.budget/.MainActivity --es rescan ticket_<id>.jpg`
   (the dialog opens; close the app instead of pressing Discard, which deletes the photo).
+
+## Desktop client (Rust)
+
+`desktop/` is a command line client of the same S3 prefix (same JSON, same "latest `updatedAt` wins" rule), so the
+laptop and the phone stay in sync. It reads `aws.properties` (`--config`, `$BUDGET_CONFIG`, `~/.config/budget/` or the
+repo root) and keeps a cache in `~/.local/share/budget/tickets.json`. It has no photos: tickets added here have none.
+
+```
+cd desktop && cargo build --release        # binary: desktop/target/release/budget
+budget tui                                 # full-screen, colour: browse, search (/), add (a), edit (e), delete (d), sync (s), categories (c)
+budget sync                                # push local changes, pull the others
+budget list [words...] [--period 2026-11]  # search, with a total
+budget summary [--period 2026]             # total per category
+budget add 14,80 "Boulangerie" --category alimentation [--date "2026-11-07 12:30"] [--description ...]
+budget edit <id> --amount 15 --category pub
+budget delete <id>
+budget scan [photo.jpg]                    # OCR a receipt photo (webcam shot when no file), confirm, save
+budget speak                               # say the amount (and a date), then the shop, in French; confirm, save
+```
+
+`scan` and `speak` are ports of `Parser.kt`, `Spoken.kt` and `Shops.kt` (same tests), and show the phone's
+confirmation dialog in the terminal: Enter keeps a value, `--yes` saves without asking. They call external tools:
+
+| Need | For | Install |
+|---|---|---|
+| `tesseract` + French data | `scan` | `sudo apt install tesseract-ocr tesseract-ocr-fra` |
+| `ffmpeg` | webcam shot (`--camera /dev/video0`) | already installed |
+| `arecord` | `speak` recording (`--seconds 5`) | already installed |
+| `whisper-cli` (whisper.cpp) + `ggml-small.bin` | `speak` recognition, offline | build whisper.cpp, model in `~/.local/share/whisper/` (`$BUDGET_WHISPER`, `$BUDGET_WHISPER_MODEL` override) |
+
+`--amount-text "quatorze euros hier" --shop-text "chez Carbone"` replaces the microphone with typed text.
